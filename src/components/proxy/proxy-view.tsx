@@ -18,10 +18,11 @@ export function ProxyView({ tab }: Props) {
   const browserProfile = useProxyStore((s) => s.settings.browserProfile);
 
   const hasUrl = Boolean(tab.url);
-  // Path-based fetch route + ua query param so the server uses the right
-  // browser profile (User-Agent + Sec-Ch-Ua headers + cookies).
+  // Unified proxy route: /api/proxy?url=<base64url>&ua=<profile>
+  // The server detects content-type and either rewrites HTML/CSS/JS or
+  // streams binary/media directly with Range support.
   const proxiedSrc = hasUrl
-    ? `/api/proxy/fetch/${encodeUrl(tab.url)}?ua=${encodeURIComponent(browserProfile)}`
+    ? `/api/proxy?url=${encodeUrl(tab.url)}&ua=${encodeURIComponent(browserProfile)}`
     : "";
 
   // Timeout fallback so the spinner never gets stuck if a page never signals.

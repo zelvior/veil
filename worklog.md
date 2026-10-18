@@ -93,3 +93,60 @@ Stage Summary:
 - Clear-cookies button in Settings → Privacy works (verified 2 → 0).
 - `bun run lint` passes clean; dev server runs with no errors.
 - Agent Browser verification: unblocker UI renders, Bing/BBC/DuckDuckGo/Hacker News/httpbin all load through the proxy with correct titles, URLs, and content.
+
+---
+Task ID: 3
+Agent: main (Z.ai Code)
+Task: Implement production-ready proxy core engine with streaming, Range support, DOM rewriting, client-side interceptor, and cookie management.
+
+Work Log:
+- Created `src/lib/proxy-engine.ts` (SERVER-ONLY module):
+  - `rewriteHtml()` — cheerio-based HTML rewriting for all URL attributes (a, area, form, link, script, img, source, video, audio, iframe, embed, object, input, button, track, image, use). Removes <base>, strips integrity/nonce/CSP-meta, injects interceptor into <head> as first child.
+  - `rewriteJs()` — light-touch JS string-literal URL rewriting.
+  - `buildInterceptorScript()` — client-side polyfill injected into <head>:
+    1. postMessage sync (reports real target URL + title to parent shell).
+    2. location.href/assign/replace interception (via Location.prototype.href setter override).
+    3. Form submit interception (ensures GET forms preserve the url param).
+    4. window.open → opens in parent shell.
+    5. target=_blank click interception.
+    6. window.fetch override (routes dynamic API calls through proxy).
+    7. XMLHttpRequest.open override.
+    8. MutationObserver (catches dynamically inserted script/img/iframe/link/etc. and rewrites src/href).
+  - `normalizeResponseHeaders()` — strips CSP, X-Frame-Options, COOP, CORP, Permissions-Policy, HSTS, Content-Encoding; manages Content-Length for rewritten vs streamed content.
+  - `buildUpstreamHeaders()` — realistic browser headers (Sec-Fetch-Dest/Mode/Site/User, Sec-Ch-Ua, Sec-Ch-Ua-Mobile, Sec-Ch-Ua-Platform, Upgrade-Insecure-Requests, Accept-Encoding).
+  - `getProxyOrigin()` — derives our public origin from x-forwarded-host/proto headers.
+- Created `src/app/api/proxy/route.ts` — unified route handling GET/POST/PUT/PATCH/DELETE/OPTIONS:
+  - **Streaming**: binary/media responses are piped directly from upstream.body (ReadableStream) to the client — zero buffering for large files/video/audio.
+  - **Range support**: forwards the Range header to upstream, passes through 206 Partial Content status + Content-Range + Accept-Ranges headers — enables HTML5 video seeking.
+  - **HTML/CSS/JS**: buffered, rewritten, returned with correct Content-Type.
+  - **GET form forwarding**: extra query params (from GET form submissions) are merged into the target URL.
+  - **POST**: forwards body + Content-Type, rewrites HTML responses.
+  - **PUT/PATCH/DELETE**: forwarded with body, streamed response.
+  - **OPTIONS**: CORS preflight handler.
+  - **Cookie forwarding**: uses fetchWithCookies() which manually follows redirects and captures Set-Cookie at each hop.
+  - **Error pages**: styled HTML error page on connection failure (not JSON).
+- Updated `src/lib/proxy.ts`:
+  - Changed to unified `/api/proxy?url=<base64url>` scheme.
+  - `proxiedUrl(url, proxyOrigin?, extra?)` — constructs absolute or absolute-path proxy URLs.
+  - `rewriteCss()` now accepts optional proxyOrigin for absolute URL construction.
+  - `proxiedFetchUrl` and `proxiedResourceUrl` are now backward-compatible aliases for `proxiedUrl`.
+- Removed old routes: `/api/proxy/fetch/[u]/route.ts` and `/api/proxy/resource/route.ts`.
+- Updated `src/components/proxy/proxy-view.tsx` — iframe src now uses `/api/proxy?url=<base64url>&ua=<profile>`.
+
+Architecture decisions documented in code comments:
+- No <base href="target"> injection: it breaks absolute-path proxy URLs (they'd resolve against the target origin). Instead, all URLs are rewritten server-side and the interceptor handles dynamic URLs.
+- Unified route (not split fetch/resource): simplifies the architecture, the route detects content-type and handles accordingly.
+- MutationObserver (not createElement override): broader coverage, catches innerHTML insertions, appendChild, and attribute changes.
+
+Stage Summary:
+- Production-ready proxy engine with streaming, Range support, and full HTTP method coverage.
+- Agent Browser verified:
+  - example.com: loads with correct title + URL ✓
+  - Hacker News: full page with stories/points/comments ✓, in-page link navigation ✓, back button ✓
+  - DDG Lite: search form submission ✓, results displayed ✓, result link navigation ✓
+  - Range requests: 206 Partial Content with Content-Range + Accept-Ranges ✓ (verified with curl)
+  - Cookies: 43 cookies captured across sessions ✓
+  - Streaming: binary assets streamed without buffering ✓
+  - Interceptor: JS chunks, fonts, CSS all proxied ✓
+- `bun run lint` passes clean; dev server runs with no errors.
+- All old routes removed; clean directory structure.

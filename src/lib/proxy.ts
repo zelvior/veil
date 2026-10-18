@@ -1,11 +1,18 @@
 /**
- * Proxy core library
- * Handles URL encoding/decoding and rewriting HTML/CSS so that
- * every resource flows back through our proxy endpoints.
+ * Proxy core library — URL encoding, URL helpers, and CSS rewriting.
+ *
+ * This module is CLIENT-SAFE (no cheerio / server-only imports) so it can
+ * be imported from both client components and server routes.
+ *
+ * The HTML/JS rewriting engine and the interceptor script builder live in
+ * `proxy-engine.ts` (server-only) to keep cheerio out of client bundles.
  */
 
-const PROXY_FETCH = "/api/proxy/fetch";
-const PROXY_RESOURCE = "/api/proxy/resource";
+/**
+ * The unified proxy route. All proxied URLs (pages, resources, forms,
+ * iframes) route through this single endpoint with ?url=<base64url>.
+ */
+export const PROXY_ROUTE = "/api/proxy";
 
 /* ------------------------------------------------------------------ */
 /* URL encoding                                                        */
@@ -25,18 +32,41 @@ export function decodeUrl(encoded: string): string {
 }
 
 /**
- * Build the proxied fetch URL for a given destination URL.
- * Uses a path segment (not a query param) so that GET-form submissions
- * work correctly: the browser appends the form's fields as the query
- * string, leaving the encoded destination URL untouched in the path.
+ * Build a proxied URL for the given destination.
+ *
+ * If `proxyOrigin` is provided, returns a fully-absolute URL
+ * (e.g. `https://host/api/proxy?url=...`).  Otherwise returns an
+ * absolute-path URL (`/api/proxy?url=...`) which resolves against
+ * whatever origin serves the page.
+ *
+ * @param url      The destination URL to proxy.
+ * @param proxyOrigin  Optional origin (e.g. `https://example.com`).
+ * @param extra    Extra query params to append (e.g. `{ ua: 'chrome-win' }`).
  */
-export function proxiedFetchUrl(url: string): string {
-  return `${PROXY_FETCH}/${encodeUrl(url)}`;
+export function proxiedUrl(
+  url: string,
+  proxyOrigin?: string,
+  extra?: Record<string, string>
+): string {
+  const base = proxyOrigin
+    ? `${proxyOrigin}${PROXY_ROUTE}?url=${encodeUrl(url)}`
+    : `${PROXY_ROUTE}?url=${encodeUrl(url)}`;
+  if (!extra) return base;
+  const params = new URLSearchParams(extra);
+  const qs = params.toString();
+  return qs ? `${base}&${qs}` : base;
 }
 
-/** Build the proxied resource URL for a given destination URL. */
-export function proxiedResourceUrl(url: string): string {
-  return `${PROXY_RESOURCE}?u=${encodeUrl(url)}`;
+/**
+ * Backward-compatible aliases.
+ * Both now use the unified /api/proxy?url= route.
+ */
+export function proxiedFetchUrl(url: string, proxyOrigin?: string): string {
+  return proxiedUrl(url, proxyOrigin);
+}
+
+export function proxiedResourceUrl(url: string, proxyOrigin?: string): string {
+  return proxiedUrl(url, proxyOrigin);
 }
 
 /* ------------------------------------------------------------------ */
@@ -76,11 +106,21 @@ export function isProxiable(url: string): boolean {
 /* CSS rewriting                                                       */
 /* ------------------------------------------------------------------ */
 
-/** Rewrite url(...) and @import statements inside a CSS string. */
-export function rewriteCss(css: string, baseUrl: string): string {
+/**
+ * Rewrite url(...) and @import statements inside a CSS string so all
+ * referenced resources route through the proxy.
+ *
+ * @param css        The raw CSS text.
+ * @param baseUrl    The URL to resolve relative URLs against.
+ * @param proxyOrigin  Optional origin for absolute proxy URLs.
+ */
+export function rewriteCss(
+  css: string,
+  baseUrl: string,
+  proxyOrigin?: string
+): string {
   if (!css) return css;
 
-  // Rewrite @import "..." / url(...)
   const rewrite = (match: string, quote: string) => {
     const raw = match.trim();
     let url = "";
@@ -97,7 +137,7 @@ export function rewriteCss(css: string, baseUrl: string): string {
     url = url.trim();
     if (!url || !isProxiable(url)) return match;
     const resolved = resolveUrl(url, baseUrl);
-    const proxied = proxiedResourceUrl(resolved);
+    const proxied = proxiedResourceUrl(resolved, proxyOrigin);
     if (raw.startsWith("@import")) {
       return `@import ${quote}${proxied}${quote}`;
     }

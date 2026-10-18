@@ -352,3 +352,42 @@ Stage Summary:
 - All official Zelvior links embedded across legal pages: email (zelvior@proton.me), GitHub, Discord, YouTube, Linktree, ORCID, NPM.
 - `bun run lint` passes clean; `@tailwindcss/typography` installed and registered.
 - Agent Browser verified: /legal index renders with all 7 page cards, /legal/privacy renders with sidebar + content + tables, footer "Legal" link navigates correctly, settings About tab shows all 7 legal links.
+
+---
+Task ID: 8
+Agent: main (Z.ai Code)
+Task: Fix Vercel build failure — Prisma client not initialized + SQLite incompatibility on serverless.
+
+Work Log:
+- **Root cause of build failure**: Vercel runs `bun install` then `bun run build`. The `@prisma/client` package needs `prisma generate` to run after install but before build. Without it, `next build` crashes during "Collecting page data" when it tries to evaluate API routes that import `@prisma/client`.
+- **Fixed `package.json`**:
+  - Added `"postinstall": "prisma generate"` — runs automatically after `bun install` on Vercel
+  - Changed `"build"` from `"next build && cp -r ..."` to just `"next build"` (the `cp` commands are for standalone self-hosting and break on Vercel)
+  - Added `"build:standalone"` for self-hosting (keeps the cp commands)
+  - Changed `"start"` to `"next start"` (standard Vercel-compatible)
+  - Added `"start:standalone"` for the standalone server
+- **Updated `next.config.ts`**: removed `output: "standalone"` (not needed on Vercel, was causing confusion with the cp commands)
+- **Made `src/lib/db.ts` graceful**: wraps Prisma client creation in try/catch, exports `db` (possibly null) and `hasDatabase` boolean
+- **Created `src/lib/memory-db.ts`**: in-memory fallback store with full Prisma-compatible API:
+  - `getDB()` returns the real Prisma client if available, or a memory-backed wrapper with `history`, `bookmark`, `quickLink`, `setting` properties matching Prisma's method signatures
+  - Uses `globalThis` for cross-request sharing in the same process
+  - Supports all operations: findMany, findFirst, create, delete, deleteMany, count, update, upsert
+- **Updated all 4 CRUD API routes** to use `getDB()` with try/catch:
+  - `/api/history` — GET/POST/DELETE return empty/error gracefully on DB failure
+  - `/api/bookmarks` — same
+  - `/api/settings` — returns defaults on DB failure
+  - `/api/quicklinks` — same
+- **Created `.env.example`** with SQLite (local) and PostgreSQL (Vercel) examples
+- **Updated `README.md`** with:
+  - "Self-Hosted (Standalone/Docker)" section using `build:standalone`
+  - "Environment Variables" section with both SQLite and PostgreSQL examples
+  - Note about in-memory fallback when DB is unavailable
+  - Full "Deploying to Vercel" section with step-by-step PostgreSQL setup guide
+
+Stage Summary:
+- **Build error fixed**: `postinstall: "prisma generate"` ensures Prisma client is generated before `next build` on Vercel
+- **Runtime graceful**: if SQLite/PostgreSQL is unavailable (e.g., Vercel without DB configured), the app uses an in-memory fallback — proxy works, APIs return empty data instead of crashing
+- **Build verified locally**: `bun run build` succeeds — all 18 routes compiled (10 static legal pages + 8 dynamic API routes), no errors
+- **All APIs verified**: history, bookmarks, settings, session, proxy all return 200 with real data (local SQLite)
+- `bun run lint` passes clean
+- For production persistence on Vercel, users should switch to PostgreSQL (documented in README with step-by-step instructions)

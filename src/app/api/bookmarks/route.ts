@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getDB } from "@/lib/memory-db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const items = await db.bookmark.findMany({ orderBy: { createdAt: "desc" } });
-  return NextResponse.json({ items });
+  try {
+    const db = getDB();
+    const items = await db.bookmark.findMany();
+    return NextResponse.json({ items });
+  } catch (e) {
+    return NextResponse.json({ items: [], error: "db_unavailable" });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -17,24 +22,34 @@ export async function POST(req: NextRequest) {
     favicon?: string;
   };
   if (!url) return NextResponse.json({ error: "url required" }, { status: 400 });
-  const existing = await db.bookmark.findFirst({ where: { url } });
-  if (existing) return NextResponse.json({ item: existing });
-  const item = await db.bookmark.create({
-    data: { url, title: title || url, favicon: favicon || null },
-  });
-  return NextResponse.json({ item });
+  try {
+    const db = getDB();
+    const existing = await db.bookmark.findFirst({ where: { url } });
+    if (existing) return NextResponse.json({ item: existing });
+    const item = await db.bookmark.create({
+      data: { url, title: title || url, favicon: favicon || null },
+    });
+    return NextResponse.json({ item });
+  } catch (e) {
+    return NextResponse.json({ error: "db_unavailable" }, { status: 503 });
+  }
 }
 
 export async function DELETE(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get("id");
-  if (id) {
-    await db.bookmark.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+  try {
+    const db = getDB();
+    const id = req.nextUrl.searchParams.get("id");
+    if (id) {
+      await db.bookmark.delete({ where: { id } });
+      return NextResponse.json({ ok: true });
+    }
+    const url = req.nextUrl.searchParams.get("url");
+    if (url) {
+      await db.bookmark.deleteMany({ where: { url } });
+      return NextResponse.json({ ok: true });
+    }
+    return NextResponse.json({ error: "specify id or url" }, { status: 400 });
+  } catch (e) {
+    return NextResponse.json({ error: "db_unavailable" }, { status: 503 });
   }
-  const url = req.nextUrl.searchParams.get("url");
-  if (url) {
-    await db.bookmark.deleteMany({ where: { url } });
-    return NextResponse.json({ ok: true });
-  }
-  return NextResponse.json({ error: "specify id or url" }, { status: 400 });
 }

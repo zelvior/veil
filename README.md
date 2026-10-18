@@ -142,13 +142,49 @@ bun run build
 bun run start
 ```
 
+### Self-Hosted (Standalone/Docker)
+
+```bash
+bun run build:standalone
+bun run start:standalone
+```
+
 ### Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (see `.env.example`):
 
 ```env
+# Local development (SQLite — default)
 DATABASE_URL="file:./db/custom.db"
+
+# Production (PostgreSQL — Vercel Postgres, Supabase, Neon, etc.)
+# DATABASE_URL="postgresql://user:password@host:5432/dbname?schema=public"
 ```
+
+> **Note:** If `DATABASE_URL` is not set or the database is unreachable, Veil
+> automatically falls back to an in-memory store. The proxy still works, but
+> history/bookmarks/settings won't persist across restarts.
+
+### Deploying to Vercel
+
+1. **Fork** the repository on GitHub
+2. **Import** it into [Vercel](https://vercel.com/new)
+3. **Set the `DATABASE_URL` environment variable** (optional — app works without it via in-memory fallback)
+4. **Deploy** — Vercel automatically runs `postinstall` (which runs `prisma generate`) then `next build`
+
+**Using PostgreSQL on Vercel (recommended for persistence):**
+
+1. Create a PostgreSQL database (Vercel Postgres, Supabase, or Neon)
+2. Update `prisma/schema.prisma`:
+   ```prisma
+   datasource db {
+     provider = "postgresql"
+     url      = env("DATABASE_URL")
+   }
+   ```
+3. Set `DATABASE_URL` in Vercel project settings
+4. Run `bun run db:push` locally to create the tables
+5. Deploy
 
 ---
 

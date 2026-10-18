@@ -238,6 +238,10 @@ export function NavigationBar() {
             Bookmarks
           </DropdownMenuItem>
           <DropdownMenuItem onClick={openSettings}>Settings</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => window.open("/legal", "_blank")}>
+            Legal &amp; Information
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

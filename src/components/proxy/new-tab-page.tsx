@@ -283,7 +283,7 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
         )}
 
         {/* Footer hint */}
-        <div className="mt-12 text-center">
+        <div className="mt-12 text-center space-y-3">
           <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
             Press{" "}
@@ -296,6 +296,19 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
             </kbd>
             for the command palette
           </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
+            <a href="/legal/about" className="hover:text-emerald-600 dark:hover:text-emerald-400">About</a>
+            <span className="text-muted-foreground/30">·</span>
+            <a href="/legal/privacy" className="hover:text-emerald-600 dark:hover:text-emerald-400">Privacy</a>
+            <span className="text-muted-foreground/30">·</span>
+            <a href="/legal/terms" className="hover:text-emerald-600 dark:hover:text-emerald-400">Terms</a>
+            <span className="text-muted-foreground/30">·</span>
+            <a href="/legal/cookies" className="hover:text-emerald-600 dark:hover:text-emerald-400">Cookies</a>
+            <span className="text-muted-foreground/30">·</span>
+            <a href="/legal/disclaimer" className="hover:text-emerald-600 dark:hover:text-emerald-400">Disclaimer</a>
+            <span className="text-muted-foreground/30">·</span>
+            <a href="/legal/contact" className="hover:text-emerald-600 dark:hover:text-emerald-400">Contact</a>
+          </div>
         </div>
       </div>
 

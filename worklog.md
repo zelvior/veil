@@ -312,3 +312,43 @@ Stage Summary:
   7. ✅ README.md: logo at the top of the header
 - Agent Browser verified: "Veil Logo" image renders on new-tab page and footer, favicon loads in browser tab, About tab shows logo + Zelvior Labs link.
 - `bun run lint` passes clean; all icon files served with 200 status.
+
+---
+Task ID: 7
+Agent: main (Z.ai Code)
+Task: Add all legal pages (Privacy, Terms, Cookies, DMCA, Disclaimer, About, Contact) and wire them into the app footer, new-tab page, settings, and navigation menu.
+
+Work Log:
+- Installed `@tailwindcss/typography` plugin and registered it in `globals.css` via `@plugin "@tailwindcss/typography"` for prose-styled legal content.
+- Added missing lucide icon re-exports to `src/components/icons.tsx`: FileText, Cookie, Copyright, Users, Mail.
+- Created `src/components/legal/legal-layout.tsx` — shared layout with:
+  - Sticky header with Veil logo, "by Zelvior Labs" text, and "Back to App" button
+  - Responsive sidebar (desktop: sticky, mobile: overlay with hamburger toggle) with 7 nav items
+  - Social links section in sidebar (GitHub, Discord, Linktree, YouTube)
+  - Main content area with prose typography (headings, tables, lists, links)
+  - Full footer with 4-column grid: brand, legal links, info links, social icons
+  - Copyright notice "© 2024 Zelvior Labs. Licensed under Apache 2.0."
+- Created 7 legal pages + 1 index page:
+  - `/legal` — index page with card grid of all 7 pages + social connect section
+  - `/legal/privacy` — 11-section Privacy Policy (no-logging, ephemeral sessions, tracker blocking, cookie table, GDPR/CCPA rights)
+  - `/legal/terms` — 12-section Terms of Service (acceptable use, no warranty, limitation of liability, Apache 2.0 IP)
+  - `/legal/cookies` — 10-section Cookie Policy (__veil_sid details, upstream cookie handling, session isolation, tracker blocking, management)
+  - `/legal/dmca` — 9-section DMCA Policy (filing requirements, takedown procedure, counter-notification, repeat infringer)
+  - `/legal/disclaimer` — 12-section Disclaimer (no anonymity guarantee, not a VPN, website compatibility, security limitations)
+  - `/legal/about` — project mission, how it works, key features, tech stack table, open source, creator bio, community, support
+  - `/legal/contact` — email, Discord, GitHub, YouTube, Linktree, ORCID, NPM contact cards + bug report guide + response times table
+- Wired legal links into the app:
+  - **Browser-shell footer**: added "Legal" link (next to social icons) that navigates to /legal
+  - **New-tab page**: added 6 legal links (About, Privacy, Terms, Cookies, Disclaimer, Contact) in the footer hint section
+  - **Settings → About tab**: added 7 legal links (About, Privacy, Terms, Cookies, DMCA, Disclaimer, Contact) below the attribution text
+  - **Navigation bar dropdown menu**: added "Legal & Information" menu item that opens /legal in a new tab
+- Updated `README.md` with a "Legal & Information" section documenting all 7 pages with a table of URLs and descriptions.
+
+Stage Summary:
+- 8 new routes created (/legal + 7 sub-pages), all returning HTTP 200.
+- Shared LegalLayout component provides consistent navigation, branding, and footer across all legal pages.
+- Every legal page includes: Veil logo, "by Zelvior Labs" attribution, sidebar nav, "Back to App" button, social links, and copyright footer.
+- Legal links are accessible from 4 places in the app: footer, new-tab page footer, settings About tab, and nav menu dropdown.
+- All official Zelvior links embedded across legal pages: email (zelvior@proton.me), GitHub, Discord, YouTube, Linktree, ORCID, NPM.
+- `bun run lint` passes clean; `@tailwindcss/typography` installed and registered.
+- Agent Browser verified: /legal index renders with all 7 page cards, /legal/privacy renders with sidebar + content + tables, footer "Legal" link navigates correctly, settings About tab shows all 7 legal links.

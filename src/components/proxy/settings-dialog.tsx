@@ -297,6 +297,15 @@ function SettingsBody() {
                 </a>{" "}
                 · Apache 2.0
               </p>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground pt-2">
+                <a href="/legal/about" className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">About</a>
+                <a href="/legal/privacy" className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">Privacy</a>
+                <a href="/legal/terms" className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">Terms</a>
+                <a href="/legal/cookies" className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">Cookies</a>
+                <a href="/legal/dmca" className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">DMCA</a>
+                <a href="/legal/disclaimer" className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">Disclaimer</a>
+                <a href="/legal/contact" className="hover:text-emerald-600 dark:hover:text-emerald-400 hover:underline">Contact</a>
+              </div>
             </section>
             <Separator />
             <section className="space-y-2">

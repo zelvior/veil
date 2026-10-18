@@ -345,6 +345,24 @@ If you find Veil useful, please consider:
 
 ---
 
+## 📄 Legal & Information
+
+Veil includes comprehensive legal documentation. All pages are accessible in-app via the footer "Legal" link or directly at:
+
+| Page | URL | Description |
+|------|-----|-------------|
+| **About** | `/legal/about` | Project mission, features, tech stack |
+| **Privacy Policy** | `/legal/privacy` | Data handling, no-logging commitment |
+| **Terms of Service** | `/legal/terms` | Usage terms and conditions |
+| **Cookie Policy** | `/legal/cookies` | How cookies work in the proxy |
+| **DMCA Policy** | `/legal/dmca` | Copyright takedown procedure |
+| **Disclaimer** | `/legal/disclaimer` | Limitations and warnings |
+| **Contact** | `/legal/contact` | All contact channels |
+
+The legal index page at [`/legal`](/legal) provides a clean card-based overview of all documentation.
+
+---
+
 <div align="center">
 
 **Veil** · Built with ❤️ by **[Zelvior Labs](https://linktr.ee/zelvior)**

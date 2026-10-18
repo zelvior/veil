@@ -11,6 +11,7 @@ import { CommandPalette } from "./command-palette";
 import { SettingsDialog } from "./settings-dialog";
 import { hostnameOf } from "@/lib/proxy";
 import { Github, DiscordIcon, YoutubeIcon, LinktreeIcon } from "@/components/icons";
+import Link from "next/link";
 
 export function BrowserShell() {
   const tabs = useProxyStore((s) => s.tabs);
@@ -206,9 +207,17 @@ function Footer({ tab }: { tab: { url: string; title: string; incognito: boolean
         </span>
       </div>
 
-      {/* Right: social links */}
+      {/* Right: legal + social links */}
       <div className="flex items-center gap-0.5">
-        <span className="hidden lg:inline text-zinc-600 mr-2">Apache 2.0</span>
+        <Link
+          href="/legal"
+          title="Legal & Information"
+          className="hidden sm:flex h-6 px-2 items-center justify-center rounded-md text-zinc-500 transition-all hover:text-emerald-400 hover:bg-zinc-800 text-[11px] font-medium"
+        >
+          Legal
+        </Link>
+        <span className="hidden lg:inline text-zinc-600 mx-1">·</span>
+        <span className="hidden lg:inline text-zinc-600 mr-1">Apache 2.0</span>
         {socialLinks.map((link) => (
           <a
             key={link.href}

@@ -1,17 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   decodeUrl,
-  resolveUrl,
   rewriteCss,
 } from "@/lib/proxy";
 import {
   rewriteHtml,
   rewriteJs,
   normalizeResponseHeaders,
-  buildUpstreamHeaders,
   getProxyOrigin,
 } from "@/lib/proxy-engine";
-import { fetchWithCookies, cookieHeaderFor } from "@/lib/cookie-jar";
+import {
+  buildSecureUpstreamHeaders,
+  anonymizeIncomingHeaders,
+  fetchWithTlsFallback,
+} from "@/lib/security-utils";
+import { isTrackerRequest, blockedResponse } from "@/lib/tracker-blocker";
+import {
+  getOrCreateSession,
+  fetchWithSessionCookies,
+  sessionCookieHeaderFor,
+  buildSessionCookieHeader,
+  extractSessionId,
+  clearSessionCookies,
+  getSessionCookieName,
+  type Session,
+} from "@/lib/session-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +55,10 @@ function getCharset(contentType: string): BufferEncoding {
   return ((m?.[1] || "utf-8") as BufferEncoding) || "utf-8";
 }
 
-/** A styled HTML error page returned when the upstream fetch fails. */
+/**
+ * A styled HTML error page returned when the upstream fetch fails.
+ * Different icons and messages for different HTTP status codes.
+ */
 function errorPage(
   targetUrl: string,
   message: string,
@@ -52,23 +68,54 @@ function errorPage(
 ): NextResponse {
   const escapedUrl = targetUrl.replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const escapedMsg = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Customize the error icon and color based on the status code.
+  let icon = "!";
+  let iconColor = "#dc2626";
+  let iconBg = "#fee2e2";
+  let title = `Unable to load page (HTTP ${status})`;
+  if (status === 403) {
+    icon = "🔒";
+    title = "Access Blocked (403)";
+  } else if (status === 404) {
+    icon = "?";
+    title = "Page Not Found (404)";
+    iconColor = "#d97706";
+    iconBg = "#fef3c7";
+  } else if (status === 500) {
+    icon = "⚠";
+    title = "Server Error (500)";
+  } else if (status === 502 || status === 504) {
+    icon = "⚠";
+    title = "Connection Failed";
+  } else if (status === 408) {
+    icon = "⏱";
+    title = "Request Timeout";
+  }
+
+  const encodedUrl = Buffer.from(targetUrl).toString("base64url");
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Proxy Error</title>
+<title>${title}</title>
 <style>
-body{font-family:system-ui,sans-serif;background:#fafafa;color:#1a1a1a;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
-.card{max-width:480px;padding:32px;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.08);text-align:center}
-.icon{width:56px;height:56px;border-radius:50%;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px}
-h1{font-size:20px;margin:0 0 8px} p{color:#6b7280;font-size:14px;margin:0 0 6px;word-break:break-all}
-.url{font-family:monospace;font-size:12px;color:#9ca3af}
-.hint{margin-top:16px;font-size:12px;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:16px}
-.retry{display:inline-block;margin-top:16px;padding:8px 20px;border-radius:8px;background:#10b981;color:#fff;text-decoration:none;font-size:14px}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:linear-gradient(135deg,#f5f7fa 0%,#e8edf3 100%);color:#1a1a1a;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
+.card{max-width:480px;padding:40px 32px;border-radius:20px;background:#fff;box-shadow:0 8px 32px rgba(0,0,0,.1);text-align:center}
+.icon{width:64px;height:64px;border-radius:50%;background:${iconBg};color:${iconColor};display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 20px;font-weight:bold}
+h1{font-size:20px;margin:0 0 12px;color:#111}
+.msg{color:#6b7280;font-size:14px;margin:0 0 8px;word-break:break-all;line-height:1.5}
+.url{font-family:monospace;font-size:12px;color:#9ca3af;background:#f9fafb;padding:8px 12px;border-radius:8px;margin:12px 0;word-break:break-all}
+.hint{margin-top:20px;font-size:12px;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:20px;line-height:1.6}
+.retry{display:inline-block;margin-top:20px;padding:10px 24px;border-radius:10px;background:#10b981;color:#fff;text-decoration:none;font-size:14px;font-weight:500;transition:background .2s}
+.retry:hover{background:#059669}
+.profiles{margin-top:12px;font-size:11px;color:#9ca3af}
 </style></head><body><div class="card">
-<div class="icon">!</div>
-<h1>Unable to load page (HTTP ${status})</h1>
-<p class="url">${escapedUrl}</p>
-<p>${escapedMsg}</p>
-<div class="hint">The destination site may be blocking proxy requests, or may be down. Try a different browser profile in Settings, or try another site.</div>
-<a class="retry" href="${proxyOrigin}/api/proxy?url=${Buffer.from(targetUrl).toString("base64url")}&ua=${encodeURIComponent(profileId || "")}">Retry</a>
+<div class="icon">${icon}</div>
+<h1>${title}</h1>
+<p class="msg">${escapedMsg}</p>
+<div class="url">${escapedUrl}</div>
+<div class="hint">The destination site may be blocking proxy requests, may be down, or may require a different browser profile. Try switching profiles in Settings, or try another site.</div>
+<a class="retry" href="${proxyOrigin}/api/proxy?url=${encodedUrl}&ua=${encodeURIComponent(profileId || "")}">↻ Retry</a>
+<div class="profiles">Tip: Different browser profiles (Chrome, Firefox, Safari, mobile) can bypass different blocking strategies.</div>
 </div></body></html>`;
   return new NextResponse(html, {
     status,
@@ -100,6 +147,28 @@ function parseTargetUrl(
   return { targetUrl, extraParams: extra };
 }
 
+/**
+ * Set the session cookie on a response if the session is new.
+ * This ensures the client receives its __veil_sid cookie on the first
+ * request, and subsequent requests carry it.
+ */
+function setSessionCookieIfNeeded(
+  response: NextResponse,
+  session: Session,
+  isHttps: boolean,
+  incomingCookie: string | null
+): NextResponse {
+  // If the incoming request already has the session cookie, no need to set it again.
+  if (incomingCookie && extractSessionId(incomingCookie) === session.id) {
+    return response;
+  }
+  response.headers.set(
+    "Set-Cookie",
+    buildSessionCookieHeader(session.id, isHttps)
+  );
+  return response;
+}
+
 /* ------------------------------------------------------------------ */
 /* GET — page navigation, resource fetch, GET form submissions         */
 /* ------------------------------------------------------------------ */
@@ -107,6 +176,20 @@ function parseTargetUrl(
 export async function GET(req: NextRequest) {
   const proxyOrigin = getProxyOrigin(req.headers);
   const profileId = req.nextUrl.searchParams.get("ua");
+  const isHttps =
+    req.headers.get("x-forwarded-proto") === "https" ||
+    req.nextUrl.protocol === "https:";
+
+  // --- Session management: get or create an ephemeral session ---
+  const incomingCookie = req.headers.get("cookie");
+  const sessionId = extractSessionId(incomingCookie);
+  const session = getOrCreateSession(sessionId);
+
+  // --- Anonymize incoming headers (strip client IP/geo/identity) ---
+  // This is done for hygiene — we don't forward client headers to the target,
+  // but we call this to ensure no identifying info leaks even if we later
+  // decide to merge incoming headers.
+  anonymizeIncomingHeaders(req.headers);
 
   const { targetUrl, extraParams } = parseTargetUrl(req.nextUrl.searchParams);
   if (!targetUrl) {
@@ -114,6 +197,15 @@ export async function GET(req: NextRequest) {
       { error: "Missing ?url= parameter" },
       { status: 400 }
     );
+  }
+
+  // --- Tracker blocking: if the target is a known tracker, return 204 ---
+  if (isTrackerRequest(targetUrl)) {
+    const res = new NextResponse(null, {
+      status: 204,
+      headers: { "X-Proxy-Blocked": "tracker" },
+    });
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
   // If there are extra query params (e.g. from a GET form submission),
@@ -132,15 +224,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Determine if this is a document (HTML) navigation or a sub-resource.
-  // The Sec-Fetch-Dest header from the browser tells us:
-  //   "document" → main page navigation → use document headers
-  //   anything else → sub-resource → use resource headers
   const fetchDest = req.headers.get("sec-fetch-dest") || "";
   const isDocument = fetchDest === "document" || fetchDest === "iframe";
-  const cookieHeader = cookieHeaderFor(finalTarget);
+  const cookieHeader = sessionCookieHeaderFor(session, finalTarget);
   const rangeHeader = req.headers.get("range");
 
-  const upstreamHeaders = buildUpstreamHeaders(
+  const upstreamHeaders = buildSecureUpstreamHeaders(
     finalTarget,
     profileId,
     cookieHeader,
@@ -157,57 +246,68 @@ export async function GET(req: NextRequest) {
 
   let upstream: Response;
   try {
-    upstream = await fetchWithCookies(finalTarget, {
-      headers: upstreamHeaders,
-    });
-  } catch (err) {
-    return errorPage(
+    // Use session-scoped cookie management + TLS fallback for robustness.
+    upstream = await fetchWithSessionCookies(
+      session,
       finalTarget,
-      `Connection failed: ${(err as Error).message}`,
-      502,
-      proxyOrigin,
-      profileId
+      { headers: upstreamHeaders }
     );
+  } catch (err) {
+    const msg = (err as Error).message;
+    // Try TLS fallback for certificate errors.
+    try {
+      upstream = await fetchWithTlsFallback(finalTarget, {
+        headers: upstreamHeaders,
+      });
+    } catch (err2) {
+      const res = errorPage(
+        finalTarget,
+        `Connection failed: ${msg}. TLS fallback also failed: ${(err2 as Error).message}`,
+        502,
+        proxyOrigin,
+        profileId
+      );
+      return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
+    }
   }
 
   const finalUrl = upstream.url || finalTarget;
   const contentType =
     upstream.headers.get("content-type") || "application/octet-stream";
 
-  // --- Handle redirects that we didn't follow (opaque redirect) ---
-  // fetchWithCookies follows redirects, but if the final response is still
-  // a redirect (e.g. too many hops), return an error page.
+  // --- Handle redirects that we didn't follow ---
   if (upstream.status >= 300 && upstream.status < 400) {
     const location = upstream.headers.get("location");
-    return errorPage(
+    const res = errorPage(
       finalTarget,
       `Too many redirects. Last redirect: ${location || "(none)"}`,
       502,
       proxyOrigin,
       profileId
     );
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
-  // --- Non-2xx responses: pass through for resources, show error for pages ---
-  // For media/resources, pass through the error status so the browser
-  // handles it correctly. For HTML navigations, show our error page.
-  if (upstream.status >= 500 && isDocument) {
-    return errorPage(
+  // --- Non-2xx: styled error pages for documents, pass-through for resources ---
+  if (upstream.status >= 400 && isDocument) {
+    const res = errorPage(
       finalTarget,
-      `Upstream server returned HTTP ${upstream.status}.`,
+      `The destination server returned HTTP ${upstream.status}.`,
       upstream.status,
       proxyOrigin,
       profileId
     );
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
-  // --- HTML / CSS / JS: buffer, rewrite, return ---
+  // --- HTML / CSS / JS: buffer, rewrite (with tracker stripping), return ---
   if (needsRewriting(contentType)) {
     const buf = Buffer.from(await upstream.arrayBuffer());
 
     if (contentType.toLowerCase().includes("text/html") || contentType.toLowerCase().includes("application/xhtml")) {
       const charset = getCharset(contentType);
       const html = buf.toString(charset);
+      // rewriteHtml now also strips tracker scripts and inline analytics.
       const rewritten = rewriteHtml({
         html,
         baseUrl: finalUrl,
@@ -219,7 +319,8 @@ export async function GET(req: NextRequest) {
       });
       headers.set("Content-Type", "text/html; charset=utf-8");
       headers.set("X-Proxied-Url", finalUrl);
-      return new NextResponse(rewritten, { status: 200, headers });
+      const res = new NextResponse(rewritten, { status: 200, headers });
+      return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
     }
 
     if (contentType.toLowerCase().includes("text/css")) {
@@ -230,7 +331,8 @@ export async function GET(req: NextRequest) {
       });
       headers.set("Content-Type", "text/css; charset=utf-8");
       headers.set("X-Proxied-Url", finalUrl);
-      return new NextResponse(rewritten, { status: 200, headers });
+      const res = new NextResponse(rewritten, { status: 200, headers });
+      return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
     }
 
     // JavaScript
@@ -241,43 +343,36 @@ export async function GET(req: NextRequest) {
     });
     headers.set("Content-Type", "application/javascript; charset=utf-8");
     headers.set("X-Proxied-Url", finalUrl);
-    return new NextResponse(rewritten, { status: 200, headers });
+    const res = new NextResponse(rewritten, { status: 200, headers });
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
   // --- Binary / media / other: STREAM directly from upstream ---
-  // This is critical for large files and video/audio: we pipe the
-  // ReadableStream from the upstream response directly to the client
-  // without buffering the entire body into memory.
-  //
-  // For Range requests (206 Partial Content), we forward the status code,
-  // Content-Range, and Accept-Ranges headers so the browser can seek.
+  // Critical for large files and video/audio: pipe the ReadableStream
+  // from upstream directly to the client without buffering into memory.
+  // For Range requests (206 Partial Content), forward status + Content-Range.
   const streamHeaders = normalizeResponseHeaders(upstream.headers, {
     rewritten: false,
     keepRangeHeaders: true,
   });
   streamHeaders.set("X-Proxied-Url", finalUrl);
 
-  // Ensure Accept-Ranges is advertised so the browser knows it can seek.
   if (!streamHeaders.has("Accept-Ranges")) {
     streamHeaders.set("Accept-Ranges", "bytes");
   }
 
-  // Forward 206 Partial Content status for Range requests.
   const responseStatus = upstream.status;
 
-  // If the upstream returned a ReadableStream body, pipe it directly.
-  // This enables zero-buffering streaming for video, audio, and large files.
   if (upstream.body) {
-    // Convert the upstream ReadableStream to a Web ReadableStream.
-    // Node's fetch body is already a Web ReadableStream<Uint8Array>.
-    return new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
+    const res = new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
       status: responseStatus,
       headers: streamHeaders,
     });
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
-  // Fallback: no body (e.g. HEAD response or empty 204).
-  return new NextResponse(null, { status: responseStatus, headers: streamHeaders });
+  const res = new NextResponse(null, { status: responseStatus, headers: streamHeaders });
+  return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
 }
 
 /* ------------------------------------------------------------------ */
@@ -287,8 +382,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const proxyOrigin = getProxyOrigin(req.headers);
   const profileId = req.nextUrl.searchParams.get("ua");
-  const { targetUrl } = parseTargetUrl(req.nextUrl.searchParams);
+  const isHttps =
+    req.headers.get("x-forwarded-proto") === "https" ||
+    req.nextUrl.protocol === "https:";
 
+  const incomingCookie = req.headers.get("cookie");
+  const sessionId = extractSessionId(incomingCookie);
+  const session = getOrCreateSession(sessionId);
+  anonymizeIncomingHeaders(req.headers);
+
+  const { targetUrl } = parseTargetUrl(req.nextUrl.searchParams);
   if (!targetUrl) {
     return NextResponse.json(
       { error: "Missing ?url= parameter" },
@@ -296,12 +399,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Tracker blocking
+  if (isTrackerRequest(targetUrl)) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: { "X-Proxy-Blocked": "tracker" },
+    });
+  }
+
   const contentType =
     req.headers.get("content-type") || "application/x-www-form-urlencoded";
   const bodyBuf = Buffer.from(await req.arrayBuffer());
 
-  const cookieHeader = cookieHeaderFor(targetUrl);
-  const upstreamHeaders = buildUpstreamHeaders(
+  const cookieHeader = sessionCookieHeaderFor(session, targetUrl);
+  const upstreamHeaders = buildSecureUpstreamHeaders(
     targetUrl,
     profileId,
     cookieHeader,
@@ -311,26 +422,27 @@ export async function POST(req: NextRequest) {
 
   let upstream: Response;
   try {
-    upstream = await fetchWithCookies(targetUrl, {
+    upstream = await fetchWithSessionCookies(session, targetUrl, {
       method: "POST",
       headers: upstreamHeaders,
       body: bodyBuf,
     });
   } catch (err) {
-    return errorPage(
+    const res = errorPage(
       targetUrl,
       `Connection failed: ${(err as Error).message}`,
       502,
       proxyOrigin,
       profileId
     );
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
   const finalUrl = upstream.url || targetUrl;
   const respContentType =
     upstream.headers.get("content-type") || "text/html; charset=utf-8";
 
-  // If the POST response is HTML, rewrite it (common for form confirmations).
+  // If the POST response is HTML, rewrite it.
   if (
     respContentType.toLowerCase().includes("text/html") ||
     respContentType.toLowerCase().includes("application/xhtml")
@@ -349,22 +461,25 @@ export async function POST(req: NextRequest) {
     });
     headers.set("Content-Type", "text/html; charset=utf-8");
     headers.set("X-Proxied-Url", finalUrl);
-    return new NextResponse(rewritten, { status: 200, headers });
+    const res = new NextResponse(rewritten, { status: 200, headers });
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
-  // Non-HTML POST responses (e.g. JSON API responses) — stream directly.
+  // Non-HTML POST responses — stream directly.
   const streamHeaders = normalizeResponseHeaders(upstream.headers, {
     rewritten: false,
     keepRangeHeaders: true,
   });
   streamHeaders.set("X-Proxied-Url", finalUrl);
   if (upstream.body) {
-    return new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
+    const res = new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
       status: upstream.status,
       headers: streamHeaders,
     });
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
-  return new NextResponse(null, { status: upstream.status, headers: streamHeaders });
+  const res = new NextResponse(null, { status: upstream.status, headers: streamHeaders });
+  return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
 }
 
 /* ------------------------------------------------------------------ */
@@ -377,8 +492,16 @@ async function forwardWithBody(
 ): Promise<NextResponse> {
   const proxyOrigin = getProxyOrigin(req.headers);
   const profileId = req.nextUrl.searchParams.get("ua");
-  const { targetUrl } = parseTargetUrl(req.nextUrl.searchParams);
+  const isHttps =
+    req.headers.get("x-forwarded-proto") === "https" ||
+    req.nextUrl.protocol === "https:";
 
+  const incomingCookie = req.headers.get("cookie");
+  const sessionId = extractSessionId(incomingCookie);
+  const session = getOrCreateSession(sessionId);
+  anonymizeIncomingHeaders(req.headers);
+
+  const { targetUrl } = parseTargetUrl(req.nextUrl.searchParams);
   if (!targetUrl) {
     return NextResponse.json(
       { error: "Missing ?url= parameter" },
@@ -386,12 +509,19 @@ async function forwardWithBody(
     );
   }
 
+  if (isTrackerRequest(targetUrl)) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: { "X-Proxy-Blocked": "tracker" },
+    });
+  }
+
   const contentType =
     req.headers.get("content-type") || "application/octet-stream";
   const bodyBuf = Buffer.from(await req.arrayBuffer());
 
-  const cookieHeader = cookieHeaderFor(targetUrl);
-  const upstreamHeaders = buildUpstreamHeaders(
+  const cookieHeader = sessionCookieHeaderFor(session, targetUrl);
+  const upstreamHeaders = buildSecureUpstreamHeaders(
     targetUrl,
     profileId,
     cookieHeader,
@@ -401,19 +531,20 @@ async function forwardWithBody(
 
   let upstream: Response;
   try {
-    upstream = await fetchWithCookies(targetUrl, {
+    upstream = await fetchWithSessionCookies(session, targetUrl, {
       method,
       headers: upstreamHeaders,
       body: bodyBuf.length > 0 ? bodyBuf : undefined,
     });
   } catch (err) {
-    return errorPage(
+    const res = errorPage(
       targetUrl,
       `Connection failed: ${(err as Error).message}`,
       502,
       proxyOrigin,
       profileId
     );
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
   const finalUrl = upstream.url || targetUrl;
@@ -423,12 +554,14 @@ async function forwardWithBody(
   });
   streamHeaders.set("X-Proxied-Url", finalUrl);
   if (upstream.body) {
-    return new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
+    const res = new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
       status: upstream.status,
       headers: streamHeaders,
     });
+    return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
-  return new NextResponse(null, { status: upstream.status, headers: streamHeaders });
+  const res = new NextResponse(null, { status: upstream.status, headers: streamHeaders });
+  return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
 }
 
 export async function PUT(req: NextRequest) {

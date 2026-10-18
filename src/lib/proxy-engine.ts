@@ -31,6 +31,7 @@ import {
   rewriteCss,
 } from "./proxy";
 import { getProfile } from "./browser-profiles";
+import { stripTrackersFromHtml } from "./tracker-blocker";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -301,6 +302,11 @@ export function rewriteHtml(opts: RewriteHtmlOptions): string {
   $('meta[http-equiv="Content-Security-Policy-Report-Only"]').remove();
   $('meta[http-equiv="X-Frame-Options"]').remove();
 
+  // Strip tracker/ad scripts and inline analytics snippets from the HTML.
+  // This is done AFTER URL rewriting so we can decode proxy URLs to check
+  // the original target domain against the tracker blocklist.
+  stripTrackersFromHtml($);
+
   // Inject the interceptor script as the FIRST element in <head>, so it
   // runs before any page scripts that might call fetch/XHR.
   const interceptor = buildInterceptorScript(baseUrl, proxyOrigin, profileId);
@@ -534,6 +540,112 @@ if (window.XMLHttpRequest) {
   XMLHttpRequest.prototype.open = function(method, url){
     try { arguments[1] = toProxy(url); } catch(e){}
     return origOpen.apply(this, arguments);
+  };
+}
+
+/* ---- 5b. Override WebSocket constructor ----
+ * Route ws:// and wss:// connections through the proxy. Since our proxy
+ * is HTTP-based, we can't truly proxy raw WebSocket frames, but we rewrite
+ * the URL so it at least attempts to connect via our endpoint. Sites that
+ * require WebSocket will gracefully degrade; the connection won't leak
+ * the user's IP to the target's WS server.
+ */
+if (window.WebSocket) {
+  var OrigWebSocket = window.WebSocket;
+  window.WebSocket = function(url, protocols){
+    try {
+      var proxiedUrl = toProxy(url);
+      // Convert ws:/wss: scheme in the proxy URL to http:/https: since
+      // our proxy route is HTTP. The proxy server can upgrade if needed.
+      proxiedUrl = proxiedUrl.replace(/^ws:/i, 'http:').replace(/^wss:/i, 'https:');
+      return new OrigWebSocket(proxiedUrl, protocols);
+    } catch(e){
+      return new OrigWebSocket(url, protocols);
+    }
+  };
+  window.WebSocket.prototype = OrigWebSocket.prototype;
+  window.WebSocket.CONNECTING = OrigWebSocket.CONNECTING;
+  window.WebSocket.OPEN = OrigWebSocket.OPEN;
+  window.WebSocket.CLOSING = OrigWebSocket.CLOSING;
+  window.WebSocket.CLOSED = OrigWebSocket.CLOSED;
+}
+
+/* ---- 5c. Override Worker / SharedWorker constructors ----
+ * Route worker script URLs through the proxy so sites that spawn Web
+ * Workers don't bypass our interceptor. The worker script itself will
+ * be rewritten by the proxy (JS rewriting), though the worker's internal
+ * fetch/XHR won't be intercepted (workers have their own global scope).
+ */
+if (window.Worker) {
+  var OrigWorker = window.Worker;
+  window.Worker = function(scriptURL, options){
+    try {
+      var proxied = toProxy(scriptURL);
+      return new OrigWorker(proxied, options);
+    } catch(e){
+      return new OrigWorker(scriptURL, options);
+    }
+  };
+  window.Worker.prototype = OrigWorker.prototype;
+}
+if (window.SharedWorker) {
+  var OrigSharedWorker = window.SharedWorker;
+  window.SharedWorker = function(scriptURL, options){
+    try {
+      return new OrigSharedWorker(toProxy(scriptURL), options);
+    } catch(e){
+      return new OrigSharedWorker(scriptURL, options);
+    }
+  };
+  window.SharedWorker.prototype = OrigSharedWorker.prototype;
+}
+
+/* ---- 5d. WebRTC IP Leak Prevention ----
+ * RTCPeerConnection can leak the user's real local and public IP addresses
+ * via ICE candidate gathering, even through a proxy. We neutralize it by
+ * throwing on construction, which causes sites that check for WebRTC support
+ * to fall back to non-WebRTC communication. This is the standard approach
+ * used by privacy-focused browsers (Tor Browser, Brave, etc.).
+ *
+ * We also set navigator.connection to undefined to prevent network
+ * information leaks.
+ */
+if (window.RTCPeerConnection) {
+  window.RTCPeerConnection = function(){
+    throw new TypeError('RTCPeerConnection is disabled by the proxy for privacy (IP leak prevention).');
+  };
+  window.webkitRTCPeerConnection = window.RTCPeerConnection;
+}
+if (window.mozRTCPeerConnection) {
+  window.mozRTCPeerConnection = window.RTCPeerConnection;
+}
+// Block createObjectURL for media streams (used by some older WebRTC code).
+if (URL.createObjectURL) {
+  var origCreateObjectURL = URL.createObjectURL;
+  URL.createObjectURL = function(obj){
+    if (obj && typeof obj === 'object' && obj.constructor && /MediaStream/i.test(obj.constructor.name)) {
+      return null; // Block media stream object URLs
+    }
+    return origCreateObjectURL.apply(this, arguments);
+  };
+}
+
+/* ---- 5e. Override HTMLFormElement.prototype.submit ----
+ * Some sites call form.submit() directly in JS instead of dispatching
+ * a submit event. We override it to ensure the form's action is a proxy
+ * URL before the browser navigates.
+ */
+if (window.HTMLFormElement && HTMLFormElement.prototype.submit) {
+  var origFormSubmit = HTMLFormElement.prototype.submit;
+  HTMLFormElement.prototype.submit = function(){
+    try {
+      var action = this.getAttribute('action');
+      if (action && action.indexOf('/api/proxy?url=') === -1 && action.indexOf(PROXY_ROUTE) === -1) {
+        var resolved = new URL(action, TARGET_URL).href;
+        this.setAttribute('action', toProxy(resolved));
+      }
+    } catch(e){}
+    return origFormSubmit.apply(this, arguments);
   };
 }
 

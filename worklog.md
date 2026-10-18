@@ -150,3 +150,50 @@ Stage Summary:
   - Interceptor: JS chunks, fonts, CSS all proxied ✓
 - `bun run lint` passes clean; dev server runs with no errors.
 - All old routes removed; clean directory structure.
+
+---
+Task ID: 4
+Agent: main (Z.ai Code)
+Task: Add advanced security, privacy, and unblocking capabilities — anti-blocking bypass, anonymity, tracker blocking, WebSocket/WebRTC interception, styled error pages.
+
+Work Log:
+- Created `src/lib/security-utils.ts`:
+  - `anonymizeIncomingHeaders()` — strips 21 client-identifying headers (X-Forwarded-For, X-Real-IP, Via, CF-Connecting-IP, True-Client-IP, X-Geo-*, etc.) before forwarding to target.
+  - `buildSecureUpstreamHeaders()` — realistic browser headers with rotated Accept-Language, DNT:1, proper Sec-Fetch-* + Sec-Ch-Ua client hints. Uses target URL as Referer (not proxy origin) to prevent domain leakage.
+  - `fetchWithTlsFallback()` — first attempt with strict TLS, on certificate errors falls back to node:https with rejectUnauthorized:false. Prevents top-level runtime crashes.
+  - `isTrackerDomain()` — checks URL against 40+ known tracker/ad domains (Google Analytics, DoubleClick, Facebook Pixel, Hotjar, Mixpanel, Sentry, Criteo, Taboola, etc.).
+- Created `src/lib/tracker-blocker.ts`:
+  - `stripTrackersFromHtml()` — cheerio-based DOM filtering: removes <script>, <iframe>, <img>, <link>, <embed>, <object> elements pointing to tracker domains. Also strips <link rel="preconnect/dns-prefetch"> to trackers and <meta http-equiv="refresh"> redirects to trackers.
+  - `stripTrackerInlineScripts()` — pattern-matches inline <script> blocks for 25+ analytics snippets (gtag, fbq, twq, hotjar, mixpanel, amplitude, dataLayer.push, etc.) and removes them.
+  - `isTrackerRequest()` + `blockedResponse()` — request-level blocking returns 204 No Content with X-Proxy-Blocked:tracker header.
+- Created `src/lib/session-store.ts`:
+  - Ephemeral per-session cookie isolation: each user gets a random 128-bit session ID stored in a __veil_sid HttpOnly cookie.
+  - `getOrCreateSession()` — creates or retrieves a session, with 30-minute inactivity timeout and automatic pruning.
+  - `fetchWithSessionCookies()` — session-scoped redirect following with cookie capture (mirrors cookie-jar's global approach but per-session).
+  - `clearSessionCookies()` — clears all cookies for the current session.
+  - Session store uses globalThis for cross-route sharing in Next.js dev mode.
+- Upgraded `src/lib/proxy-engine.ts` interceptor script with new client-side patches:
+  - **WebSocket** constructor override — routes ws://wss:// through proxy URL.
+  - **Worker** + **SharedWorker** constructors — route worker script URLs through proxy.
+  - **RTCPeerConnection** + webkitRTCPeerConnection + mozRTCPeerConnection — throw on construction to prevent WebRTC IP leaks (standard privacy-browser approach).
+  - **URL.createObjectURL** — blocks MediaStream object URLs.
+  - **HTMLFormElement.prototype.submit** — ensures form action is a proxy URL before JS-initiated submit.
+  - Integrated `stripTrackersFromHtml()` into `rewriteHtml()` — tracker scripts stripped after URL rewriting (so proxy URLs can be decoded to check domains).
+- Upgraded `src/app/api/proxy/route.ts`:
+  - Integrated session management (getOrCreateSession + setSessionCookieIfNeeded on every response).
+  - Integrated `anonymizeIncomingHeaders()` — strips client IP/geo headers.
+  - Integrated `buildSecureUpstreamHeaders()` — rotated Accept-Language, DNT, proper Sec-Ch-Ua.
+  - Integrated `fetchWithTlsFallback()` — graceful TLS error handling.
+  - Integrated tracker blocking at request level (returns 204 for tracker domains).
+  - Upgraded `errorPage()` with status-specific icons/colors: 🔒 403, ? 404, ⚠ 500/502, ⏱ 408. Gradient background, retry button, profile tip.
+  - All HTTP methods (GET/POST/PUT/PATCH/DELETE/OPTIONS) now use session cookies + secure headers + tracker blocking.
+- Created `src/app/api/session/route.ts` — GET returns session info, POST clears session cookies.
+
+Stage Summary:
+- All 4 requirement areas implemented and verified:
+  1. **Anti-blocking bypass**: header rotation (Accept-Language), realistic Sec-Ch-Ua/Sec-Fetch headers, TLS fallback for cert errors, full CSP/X-Frame-Options/COOP/CORP stripping.
+  2. **Privacy & anonymity**: 21 client-identifying headers stripped (verified via httpbin — NO X-Forwarded-For/X-Real-IP/Via forwarded), ephemeral session cookies with 30-min timeout, 40+ tracker domains blocked at DOM + request level.
+  3. **Advanced client-side injection**: WebSocket, Worker, SharedWorker, RTCPeerConnection (WebRTC IP leak prevention), HTMLFormElement.submit, URL.createObjectURL all patched. Existing fetch/XHR/location/MutationObserver patches retained.
+  4. **Edge streaming & error handling**: ReadableStream piping for media (verified 206 Range support), styled error pages for 403/404/500/502/408 with status-specific icons.
+- Agent Browser verified: example.com ✓, Hacker News ✓ (full stories), BBC News ✓ (full nav, no tracker requests fired).
+- `bun run lint` passes clean; dev server runs with no errors.

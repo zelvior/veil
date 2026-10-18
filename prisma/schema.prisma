@@ -1,0 +1,48 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model History {
+  id        String   @id @default(cuid())
+  url       String
+  title     String   @default("")
+  favicon   String?
+  visitedAt DateTime @default(now())
+
+  @@index([visitedAt])
+  @@index([url])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  url       String
+  title     String
+  favicon   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([url])
+}
+
+model QuickLink {
+  id        String   @id @default(cuid())
+  url       String
+  title     String
+  icon      String?
+  color     String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  id    String @id
+  value String
+}

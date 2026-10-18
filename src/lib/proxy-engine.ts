@@ -72,17 +72,31 @@ const STRIP_RESPONSE_HEADERS = [
 
 /**
  * Build a clean set of response headers for the proxied content.
- * Strips security headers that would block framing/embedding, removes
- * Content-Encoding (Node fetch auto-decompresses, so the body we serve
- * is always identity), and optionally removes Content-Length (when the
- * body has been rewritten and the length no longer matches).
+ *
+ * CRITICAL: We ALWAYS strip Content-Encoding (Node fetch auto-decompresses
+ * the body, so what we serve is always identity-encoded). This means we
+ * must ALSO strip Content-Length when the upstream used compression,
+ * because the Content-Length from the upstream reflects the COMPRESSED
+ * size — not the decompressed size we're actually sending. A mismatch
+ * here causes "ERR_CONNECTION_RESET" / "The connection was reset" in
+ * the browser.
+ *
+ * For 206 Partial Content responses (Range requests), we KEEP the
+ * Content-Range header so video seeking works, but still strip
+ * Content-Length if the body was decompressed.
  */
 export function normalizeResponseHeaders(
   upstreamHeaders: Headers,
   opts: { rewritten: boolean; keepRangeHeaders?: boolean }
 ): Headers {
   const out = new Headers();
-  const keepRange = opts.keepRangeHeaders ?? false;
+
+  // Check if the upstream used compression. If so, the Content-Length
+  // is wrong for our decompressed body and MUST be stripped.
+  const hadCompression = (() => {
+    const enc = upstreamHeaders.get("content-encoding");
+    return !!enc && enc.toLowerCase() !== "identity";
+  })();
 
   upstreamHeaders.forEach((value, key) => {
     const lower = key.toLowerCase();
@@ -93,18 +107,21 @@ export function normalizeResponseHeaders(
     // Node fetch auto-decompresses; the body we serve is always identity.
     if (lower === "content-encoding") return;
 
-    // For rewritten content the body length changes — drop Content-Length
-    // so the framework uses chunked transfer encoding.
-    if (opts.rewritten && lower === "content-length") return;
-
-    // For streamed (non-rewritten) content, keep Content-Length and
-    // Content-Range so media seeking / progress bars work.
-    if (!keepRange && (lower === "content-range" || lower === "accept-ranges")) {
-      // still keep these — they're needed for Range support
+    // ALWAYS strip Content-Length if:
+    // 1. The body was rewritten (HTML/CSS/JS — length changed), OR
+    // 2. The upstream used compression (length reflects compressed size,
+    //    but our body is decompressed — mismatch causes connection reset)
+    if (lower === "content-length") {
+      if (opts.rewritten || hadCompression) return;
+      // For non-compressed, non-rewritten content, keep Content-Length
+      // so the browser can show download progress.
     }
 
     // Don't forward Set-Cookie to the client — we manage cookies server-side.
     if (lower === "set-cookie") return;
+
+    // Strip Transfer-Encoding — we control the transfer, not the upstream.
+    if (lower === "transfer-encoding") return;
 
     out.set(key, value);
   });

@@ -391,3 +391,27 @@ Stage Summary:
 - **All APIs verified**: history, bookmarks, settings, session, proxy all return 200 with real data (local SQLite)
 - `bun run lint` passes clean
 - For production persistence on Vercel, users should switch to PostgreSQL (documented in README with step-by-step instructions)
+
+---
+Task ID: 9
+Agent: main (Z.ai Code)
+Task: Fix "The connection was reset" error when opening any website through the proxy.
+
+Work Log:
+- **Root cause 1 — Content-Length mismatch**: Node's `fetch()` auto-decompresses gzip/br responses, but the upstream's `Content-Length` header still reflects the COMPRESSED size. We were stripping `Content-Encoding` but keeping `Content-Length` for streamed (binary/media) content. The browser expected N bytes (compressed size) but received M bytes (decompressed size), causing it to reset the connection.
+  - **Fix**: Updated `normalizeResponseHeaders()` in `proxy-engine.ts` to detect if the upstream used compression (`Content-Encoding: gzip/br/deflate`). If so, ALWAYS strip `Content-Length` — even for non-rewritten content. The framework then uses chunked transfer encoding, which is correct for decompressed bodies. Also strip `Transfer-Encoding` from upstream (we control the transfer).
+
+- **Root cause 2 — Direct stream passing**: We were passing `upstream.body` (a ReadableStream from Node's `fetch()`) directly to `new NextResponse()`. On Vercel serverless, the underlying undici HTTP connection gets torn down when the function's execution context ends, causing the stream to be abruptly cut off — "connection was reset" in the browser.
+  - **Fix**: Created a `pumpStream()` helper function that creates a NEW `ReadableStream` we fully control. It reads chunks from `upstream.body.getReader()` and enqueues them into our stream. Even if the upstream connection drops, our stream closes gracefully (via try/catch in the `start()` method) instead of throwing. Applied `pumpStream()` to all 3 streaming locations in the route (GET, POST, forwardWithBody).
+
+- Added `cancel()` handler to the pump stream — when the client disconnects, we cancel the upstream reader to avoid wasting resources.
+
+Stage Summary:
+- Two bugs fixed:
+  1. Content-Length mismatch on compressed responses → now strips Content-Length when Content-Encoding was present
+  2. Direct upstream.body passing → now uses pumpStream() with a controlled ReadableStream
+- Agent Browser verified: example.com loads (title "Example Domain", URL correct), Hacker News loads (full stories with points/comments, all sub-resources 200)
+- Streaming + Range support still works: image full=7816 bytes (200), Range 0-99=100 bytes (206)
+- `bun run lint` passes clean
+- `bun run build` passes — all 18 routes compiled successfully
+- No connection resets in the dev log

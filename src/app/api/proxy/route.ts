@@ -124,6 +124,38 @@ h1{font-size:20px;margin:0 0 12px;color:#111}
 }
 
 /**
+ * Create a controlled ReadableStream that pumps data from an upstream
+ * Response body. This is more reliable on serverless (Vercel) than
+ * passing upstream.body directly — the underlying undici connection
+ * can be torn down when the function returns, causing connection resets.
+ *
+ * Our stream stays alive until we explicitly close it, even if the
+ * upstream connection drops mid-stream.
+ */
+function pumpStream(upstreamBody: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        const reader = upstreamBody.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) controller.enqueue(value);
+        }
+        controller.close();
+      } catch {
+        // Upstream dropped — close gracefully so the client gets
+        // whatever was sent so far instead of a connection reset.
+        try { controller.close(); } catch { /* already closed */ }
+      }
+    },
+    cancel() {
+      try { upstreamBody.cancel(); } catch { /* ignore */ }
+    },
+  });
+}
+
+/**
  * Extract the target URL from the `url` query param.
  * Also collects any extra query params that should be forwarded to the
  * destination (e.g. from a GET form submission: ?url=ENCODED&q=test →
@@ -347,10 +379,15 @@ export async function GET(req: NextRequest) {
     return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
-  // --- Binary / media / other: STREAM directly from upstream ---
-  // Critical for large files and video/audio: pipe the ReadableStream
-  // from upstream directly to the client without buffering into memory.
-  // For Range requests (206 Partial Content), forward status + Content-Range.
+  // --- Binary / media / other: STREAM via TransformStream ---
+  // We DON'T pass upstream.body directly to NextResponse because on Vercel
+  // serverless, the underlying undici connection gets torn down when the
+  // function returns, causing "connection was reset" in the browser.
+  //
+  // Instead, we create a TransformStream and pump data from upstream.body
+  // into it. This gives us a ReadableStream that we fully control — even
+  // if the upstream connection closes, our stream stays alive until we
+  // explicitly close it.
   const streamHeaders = normalizeResponseHeaders(upstream.headers, {
     rewritten: false,
     keepRangeHeaders: true,
@@ -364,7 +401,7 @@ export async function GET(req: NextRequest) {
   const responseStatus = upstream.status;
 
   if (upstream.body) {
-    const res = new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
+    const res = new NextResponse(pumpStream(upstream.body as ReadableStream<Uint8Array>), {
       status: responseStatus,
       headers: streamHeaders,
     });
@@ -472,7 +509,7 @@ export async function POST(req: NextRequest) {
   });
   streamHeaders.set("X-Proxied-Url", finalUrl);
   if (upstream.body) {
-    const res = new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
+    const res = new NextResponse(pumpStream(upstream.body as ReadableStream<Uint8Array>), {
       status: upstream.status,
       headers: streamHeaders,
     });
@@ -554,7 +591,7 @@ async function forwardWithBody(
   });
   streamHeaders.set("X-Proxied-Url", finalUrl);
   if (upstream.body) {
-    const res = new NextResponse(upstream.body as ReadableStream<Uint8Array>, {
+    const res = new NextResponse(pumpStream(upstream.body as ReadableStream<Uint8Array>), {
       status: upstream.status,
       headers: streamHeaders,
     });

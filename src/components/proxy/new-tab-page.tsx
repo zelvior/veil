@@ -94,6 +94,14 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
       <div className="mx-auto max-w-5xl">
         {/* Hero — Unblocker */}
         <div className="text-center mb-8">
+          {/* Veil Logo */}
+          <div className="mb-5 flex justify-center">
+            <img
+              src="/logo.png"
+              alt="Veil Logo"
+              className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl shadow-md object-contain bg-white"
+            />
+          </div>
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-4">
             <Shield className="h-3.5 w-3.5" />
             Website Unblocker

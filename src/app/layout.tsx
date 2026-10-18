@@ -42,8 +42,14 @@ export const metadata: Metadata = {
   publisher: "Zelvior Labs",
   category: "technology",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-    shortcut: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    shortcut: "/favicon.png",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   openGraph: {
     type: "website",
@@ -55,9 +61,9 @@ export const metadata: Metadata = {
       "Unblock any website with Veil — a high-performance, privacy-first web proxy with multi-tab browsing, tracker blocking, WebRTC leak prevention, and streaming media support. Built by Zelvior Labs.",
     images: [
       {
-        url: "https://opengraph.githubassets.com/1/zelvior/veil",
-        width: 1200,
-        height: 630,
+        url: "/logo.png",
+        width: 512,
+        height: 512,
         alt: "Veil — Private Web Proxy Browser",
       },
     ],
@@ -68,7 +74,7 @@ export const metadata: Metadata = {
     description:
       "Unblock any website with Veil — privacy-first web proxy with tracker blocking, WebRTC protection, and streaming. By Zelvior Labs.",
     creator: "@zelviorhere",
-    images: ["https://opengraph.githubassets.com/1/zelvior/veil"],
+    images: ["/logo.png"],
   },
   robots: {
     index: true,

@@ -261,9 +261,11 @@ function SettingsBody() {
           <TabsContent value="about" className="mt-0 space-y-4">
             <section className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-white">
-                  <Shield className="h-6 w-6" />
-                </div>
+                <img
+                  src="/logo.png"
+                  alt="Veil Logo"
+                  className="h-12 w-12 rounded-xl shadow-sm bg-white"
+                />
                 <div>
                   <h3 className="font-semibold">Veil Proxy Browser</h3>
                   <p className="text-xs text-muted-foreground">v1.0.0 · Next.js 16</p>
@@ -273,6 +275,27 @@ function SettingsBody() {
                 A feature-rich web proxy that lets you browse the web privately
                 from a single page. Built with Next.js, Prisma, and the shadcn/ui
                 component library.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Built by{" "}
+                <a
+                  href="https://linktr.ee/zelvior"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                >
+                  Zelvior Labs
+                </a>{" "}
+                ·{" "}
+                <a
+                  href="https://github.com/zelvior/veil"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                >
+                  GitHub
+                </a>{" "}
+                · Apache 2.0
               </p>
             </section>
             <Separator />

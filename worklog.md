@@ -275,3 +275,40 @@ Stage Summary:
   - YouTube: https://youtube.com/@zelviorhere (footer + metadata twitter creator + README badge)
   - Linktree: https://linktr.ee/zelvior (footer "Zelvior Labs" link + package.json + README badge)
   - Discord: https://discord.gg/UQfzQzymc (footer + README badge + header quick-nav)
+
+---
+Task ID: 6
+Agent: main (Z.ai Code)
+Task: Integrate the uploaded Zelvior "V" logo as the official Veil favicon, app icon, and UI logo across the codebase.
+
+Work Log:
+- Analyzed the uploaded logo (`upload/pasted_image_1792339108991.png`) using VLM: stylized black "V" with flowing cape/wing element on white background — perfect for the Veil brand, highly scalable.
+- Copied logo to `public/logo.png` (full 364KB) and `public/favicon.png`.
+- Generated optimized icon sizes using `sharp`:
+  - `public/favicon-32.png` (32×32, 870 bytes) — standard favicon
+  - `public/apple-touch-icon.png` (180×180, 11KB) — iOS home screen icon
+  - `public/icon-192.png` (192×192) — Android/PWA icon
+  - `public/icon-512.png` (512×512) — PWA splash icon
+- Updated `src/app/layout.tsx` metadata:
+  - `icons.icon`: array with /favicon.png + /favicon-32.png (32x32)
+  - `icons.shortcut`: /favicon.png
+  - `icons.apple`: /apple-touch-icon.png (180x180)
+  - `openGraph.images`: /logo.png (512x512)
+  - `twitter.images`: /logo.png
+- Added logo to new-tab page hero (`new-tab-page.tsx`): 64×64 (mobile) / 80×80 (desktop) rounded-2xl with shadow, displayed above the "Unblock any website" heading.
+- Added logo to footer (`browser-shell.tsx`): 16×16 rounded-sm next to "Veil" text, replacing the shield icon.
+- Added logo to Settings → About tab (`settings-dialog.tsx`): 48×48 rounded-xl, replacing the emerald shield box. Also added "Built by Zelvior Labs · GitHub · Apache 2.0" attribution links below the description.
+- Updated `README.md` header: replaced the 🛡️ emoji with `<img src="public/logo.png" width="120" height="120" />`.
+- Removed unused `Shield` import from `browser-shell.tsx`.
+
+Stage Summary:
+- Logo fully integrated across the entire codebase:
+  1. ✅ Favicon: /favicon.png + /favicon-32.png (served and linked in HTML head)
+  2. ✅ Apple touch icon: /apple-touch-icon.png (180×180)
+  3. ✅ OpenGraph + Twitter image: /logo.png
+  4. ✅ New-tab page hero: logo displayed prominently above the Unblocker heading
+  5. ✅ Footer: logo next to "Veil" brand name
+  6. ✅ Settings → About: logo + "Built by Zelvior Labs · GitHub · Apache 2.0"
+  7. ✅ README.md: logo at the top of the header
+- Agent Browser verified: "Veil Logo" image renders on new-tab page and footer, favicon loads in browser tab, About tab shows logo + Zelvior Labs link.
+- `bun run lint` passes clean; all icon files served with 200 status.

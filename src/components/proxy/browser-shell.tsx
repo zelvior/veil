@@ -10,7 +10,7 @@ import { Sidebar } from "./sidebar";
 import { CommandPalette } from "./command-palette";
 import { SettingsDialog } from "./settings-dialog";
 import { hostnameOf } from "@/lib/proxy";
-import { Shield, Github, DiscordIcon, YoutubeIcon, LinktreeIcon } from "@/components/icons";
+import { Github, DiscordIcon, YoutubeIcon, LinktreeIcon } from "@/components/icons";
 
 export function BrowserShell() {
   const tabs = useProxyStore((s) => s.tabs);
@@ -182,7 +182,7 @@ function Footer({ tab }: { tab: { url: string; title: string; incognito: boolean
     <footer className="flex items-center justify-between border-t border-border bg-zinc-950 px-3 py-1.5 text-[11px] text-zinc-400 dark:text-zinc-400">
       {/* Left: proxy status */}
       <div className="flex items-center gap-2 min-w-0">
-        <Shield className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+        <img src="/logo.png" alt="Veil" className="h-4 w-4 rounded-sm flex-shrink-0 bg-white" />
         <span className="font-semibold text-zinc-200">Veil</span>
         <span className="text-zinc-600">·</span>
         <span className="hidden sm:inline text-zinc-500">

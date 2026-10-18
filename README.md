@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🛡️ Veil
+<img src="public/logo.png" alt="Veil Logo" width="120" height="120" />
+
+# Veil
 
 ### Private Web Proxy Browser
 

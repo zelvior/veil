@@ -53,7 +53,7 @@ export function BrowserShell() {
             searchEngine: st.settings.searchEngine,
             showBookmarksBar: st.settings.showBookmarksBar === "true",
             theme: st.settings.theme,
-            userAgent: st.settings.userAgent,
+            browserProfile: st.settings.browserProfile,
           });
         }
       } catch (e) {

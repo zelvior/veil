@@ -48,3 +48,48 @@ Stage Summary:
 - Data persisted in SQLite via Prisma (History, Bookmark, QuickLink, Setting).
 - `bun run lint` passes clean; dev server runs on port 3000 with no errors.
 - Known limitation: some sites (e.g. Wikipedia) block datacenter IPs / proxied requests — this is the destination site blocking the proxy, not an app bug.
+
+---
+Task ID: 2
+Agent: main (Z.ai Code)
+Task: Add website unblocker functionality, fix all bugs, make everything real and working.
+
+Work Log:
+- Created `src/lib/cookie-jar.ts`: a full in-memory cookie jar with domain/path matching, Set-Cookie parsing, expiry handling, and a `fetchWithCookies()` helper that manually follows redirects to capture Set-Cookie headers on 3xx responses (Node's `redirect: "follow"` silently drops them). Used `globalThis` to share the jar across all API routes in Next.js dev mode.
+- Created `src/lib/browser-profiles.ts`: 7 real browser profiles (Chrome Win/Mac, Firefox Win, Safari Mac, Edge Win, Chrome Android, Safari iOS) with full User-Agent strings + Sec-Ch-Ua/Sec-Ch-Ua-Platform headers, plus unblocker site categories (Search, Social, News, Reference, Media, Tech) with 34 popular sites.
+- Rewrote the proxy fetch route from `/api/proxy/fetch?u=` to `/api/proxy/fetch/[u]/route.ts` (path-based):
+  - Fixes the GET-form collision bug (form fields no longer overwrite the `u` query param).
+  - Added POST handler for form submissions (reads body, forwards Content-Type and body to destination).
+  - Uses `fetchWithCookies()` for all upstream requests (cookies captured on every redirect hop).
+  - Sends full real-browser headers: Sec-Fetch-Dest/Mode/Site/User, Sec-Ch-Ua, Sec-Ch-Ua-Mobile, Sec-Ch-Ua-Platform, Upgrade-Insecure-Requests, Accept-Encoding.
+  - Supports `?ua=<profileId>` query param to select the browser profile.
+  - Forwards GET-form query fields to the destination URL.
+  - Returns a styled error page (instead of JSON) on connection failure.
+- Updated `src/app/api/proxy/resource/route.ts`: uses `fetchWithCookies()`, real browser headers, added POST handler (for tracking beacons) and OPTIONS handler (CORS preflight).
+- Created `/api/proxy/clear` route (GET returns cookie count, POST clears all cookies).
+- Updated `src/lib/proxy.ts`: `proxiedFetchUrl()` now uses path-based URL (`/api/proxy/fetch/ENCODED`) instead of query param.
+- Updated `src/store/proxy-store.ts`: replaced `userAgent: "default"` with `browserProfile: "chrome-win"` in Settings.
+- Updated `src/components/proxy/proxy-view.tsx`: passes `?ua=<profileId>` in the iframe src so the server uses the selected browser profile.
+- Rewrote `src/components/proxy/new-tab-page.tsx`: new "Unblock any website" hero with prominent input + "Unblock" button, expandable category sections (Search/Social/News/Reference/Media/Tech) with 34 popular sites, shows the current browser profile.
+- Updated `src/components/proxy/settings-dialog.tsx`: added Browser Profile selector (7 profiles), added "Cookies & sessions → Clear" button in the Privacy tab, updated the About feature list.
+- Updated `src/app/api/settings/route.ts`: new defaults (`browserProfile: "chrome-win"`), removed unused old settings.
+- Updated `src/components/proxy/browser-shell.tsx`: loads `browserProfile` from the settings API.
+- Enhanced the bootstrap script injected into proxied pages: intercepts `fetch()` and `XMLHttpRequest.open()` to route absolute https URLs through the resource proxy (so SPAs that fetch data work correctly).
+
+Bugs fixed:
+- GET-form submission collision: form fields were overwriting the `u` query param, breaking search forms. Fixed by using a path segment for the encoded URL.
+- Cookie loss on redirects: `redirect: "follow"` discarded Set-Cookie headers from 3xx responses. Fixed with `fetchWithCookies()` which manually follows redirects and captures cookies at each hop.
+- Module isolation in dev mode: the cookie jar was not shared between API routes. Fixed by storing the jar on `globalThis`.
+- 405 errors for POST resources: tracking beacons (e.g. Optimizely, DoubleClick) POST to absolute URLs rewritten through the resource proxy. Added a POST handler that forwards and a catch-all 204 fallback.
+- `getSetCookie()` detection: improved with `typeof` check and fallback to `headers.get("set-cookie")`.
+
+Stage Summary:
+- The proxy now has a real "Website Unblocker" feature with category shortcuts for 34 popular sites.
+- 7 selectable browser profiles with real User-Agent strings and Sec-Ch-Ua headers.
+- Full cookie & session forwarding: sites that require cookies (Bing, DuckDuckGo, BBC, etc.) now work correctly. Verified: Bing set 14 cookies, search worked; BBC News loaded with all images/fonts/scripts.
+- Form submissions (GET and POST) work through the proxy. Verified: DuckDuckGo search, Bing search.
+- In-page navigation works (clicking links inside the proxied page updates the address bar and tab title). Verified: Hacker News → /newest → back.
+- Back/forward navigation works per-tab.
+- Clear-cookies button in Settings → Privacy works (verified 2 → 0).
+- `bun run lint` passes clean; dev server runs with no errors.
+- Agent Browser verification: unblocker UI renders, Bing/BBC/DuckDuckGo/Hacker News/httpbin all load through the proxy with correct titles, URLs, and content.

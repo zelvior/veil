@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { normaliseAddressInput, faviconFor } from "@/lib/proxy";
+import { DEFAULT_PROFILE_ID } from "@/lib/browser-profiles";
 
 export interface Tab {
   id: string;
@@ -49,7 +50,8 @@ export interface QuickLink {
 
 export interface Settings {
   searchEngine: string;
-  userAgent: string;
+  /** Browser profile id (from BROWSER_PROFILES). */
+  browserProfile: string;
   theme: "light" | "dark" | "system";
   showBookmarksBar: boolean;
 }
@@ -147,7 +149,7 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
   bookmarksBarVisible: true,
   settings: {
     searchEngine: SEARCH_ENGINES.duckduckgo,
-    userAgent: "default",
+    browserProfile: DEFAULT_PROFILE_ID,
     theme: "system",
     showBookmarksBar: true,
   },

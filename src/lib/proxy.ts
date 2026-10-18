@@ -24,9 +24,14 @@ export function decodeUrl(encoded: string): string {
   return Buffer.from(b64, "base64").toString("utf-8");
 }
 
-/** Build the proxied fetch URL for a given destination URL. */
+/**
+ * Build the proxied fetch URL for a given destination URL.
+ * Uses a path segment (not a query param) so that GET-form submissions
+ * work correctly: the browser appends the form's fields as the query
+ * string, leaving the encoded destination URL untouched in the path.
+ */
 export function proxiedFetchUrl(url: string): string {
-  return `${PROXY_FETCH}?u=${encodeUrl(url)}`;
+  return `${PROXY_FETCH}/${encodeUrl(url)}`;
 }
 
 /** Build the proxied resource URL for a given destination URL. */

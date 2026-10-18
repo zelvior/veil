@@ -2,7 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useProxyStore } from "@/store/proxy-store";
-import { Plus, X, Globe, Clock, Search, Sparkles } from "lucide-react";
+import {
+  Plus,
+  X,
+  Globe,
+  Clock,
+  Search,
+  Sparkles,
+  Shield,
+  Users,
+  Newspaper,
+  BookOpen,
+  Play,
+  Cpu,
+  Zap,
+  Lock,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +31,17 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { faviconFor, hostnameOf } from "@/lib/proxy";
+import { UNBLOCK_CATEGORIES, BROWSER_PROFILES, getProfile } from "@/lib/browser-profiles";
 import type { Tab } from "@/store/proxy-store";
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Search,
+  Users,
+  Newspaper,
+  BookOpen,
+  Play,
+  Cpu,
+};
 
 const SUGGESTED = [
   { url: "https://en.wikipedia.org", title: "Wikipedia", color: "#0a0a0a" },
@@ -25,8 +52,6 @@ const SUGGESTED = [
   { url: "https://www.reddit.com", title: "Reddit", color: "#ff4500" },
   { url: "https://stackoverflow.com", title: "Stack Overflow", color: "#f48024" },
   { url: "https://www.bbc.com/news", title: "BBC News", color: "#bb1919" },
-  { url: "https://www.theguardian.com", title: "The Guardian", color: "#052962" },
-  { url: "https://lite.duckduckgo.com", title: "DDG Lite", color: "#de5833" },
 ];
 
 export function NewTabPageContent({ tab }: { tab: Tab }) {
@@ -35,16 +60,16 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
   const addQuickLink = useProxyStore((s) => s.addQuickLink);
   const removeQuickLink = useProxyStore((s) => s.removeQuickLink);
   const history = useProxyStore((s) => s.history);
+  const browserProfile = useProxyStore((s) => s.settings.browserProfile);
   const [query, setQuery] = useState("");
-  const [time, setTime] = useState(new Date());
   const [addOpen, setAddOpen] = useState(false);
   const [newUrl, setNewUrl] = useState("");
   const [newTitle, setNewTitle] = useState("");
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(
+    "Search"
+  );
 
-  useEffect(() => {
-    const id = setInterval(() => setTime(new Date()), 1000 * 30);
-    return () => clearInterval(id);
-  }, []);
+  const profile = getProfile(browserProfile);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,40 +77,128 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
     navigate(tab.id, query);
   };
 
-  const quickLinksList = quickLinks.length ? quickLinks : SUGGESTED.map((s, i) => ({
-    id: `sug-${i}`,
-    url: s.url,
-    title: s.title,
-    icon: null,
-    color: s.color,
-  }));
+  const quickLinksList = quickLinks.length
+    ? quickLinks
+    : SUGGESTED.map((s, i) => ({
+        id: `sug-${i}`,
+        url: s.url,
+        title: s.title,
+        icon: null,
+        color: s.color,
+      }));
 
   const recent = history.slice(0, 6);
 
   return (
-    <div className="min-h-full w-full px-4 py-10 sm:px-8 sm:py-16">
-      <div className="mx-auto max-w-4xl">
-        {/* Clock + Greeting */}
+    <div className="min-h-full w-full px-4 py-8 sm:px-8 sm:py-12">
+      <div className="mx-auto max-w-5xl">
+        {/* Hero — Unblocker */}
         <div className="text-center mb-8">
-          <div className="text-5xl sm:text-6xl font-bold tracking-tight tabular-nums">
-            {time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-4">
+            <Shield className="h-3.5 w-3.5" />
+            Website Unblocker
           </div>
-          <p className="mt-2 text-muted-foreground text-sm">
-            {greeting()} — browse the web privately through the proxy
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+            Unblock any website
+          </h1>
+          <p className="text-muted-foreground text-sm max-w-md mx-auto">
+            Enter a URL below to bypass restrictions and browse privately.
+            Your request is fetched server-side and rendered through the proxy.
           </p>
         </div>
 
-        {/* Search */}
-        <form onSubmit={handleSubmit} className="relative mx-auto max-w-2xl mb-10 group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-emerald-500 transition-colors" />
+        {/* Unblock search bar */}
+        <form onSubmit={handleSubmit} className="relative mx-auto max-w-2xl mb-3 group">
+          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-emerald-500" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search the web or enter a URL"
+            placeholder="Enter a website URL to unblock  (e.g. wikipedia.org)"
             autoFocus
-            className="h-14 pl-12 pr-4 rounded-full text-base shadow-sm border-2 border-transparent focus-visible:border-emerald-500/40 focus-visible:ring-emerald-500/20 bg-white dark:bg-zinc-900"
+            className="h-14 pl-12 pr-32 rounded-2xl text-base shadow-md border-2 border-transparent focus-visible:border-emerald-500/40 focus-visible:ring-emerald-500/20 bg-white dark:bg-zinc-900"
           />
+          <Button
+            type="submit"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-10 rounded-xl px-5 bg-emerald-500 hover:bg-emerald-600 text-white"
+          >
+            <Zap className="h-4 w-4 mr-1.5" />
+            Unblock
+          </Button>
         </form>
+        <p className="text-center text-[11px] text-muted-foreground mb-10">
+          Browsing as <span className="font-medium text-foreground/80">{profile.label}</span> ·
+          cookies &amp; sessions preserved · change profile in Settings
+        </p>
+
+        {/* Unblock categories */}
+        <div className="mb-10">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Globe className="h-4 w-4" /> Popular Sites to Unblock
+          </h2>
+          <div className="space-y-2">
+            {UNBLOCK_CATEGORIES.map((cat) => {
+              const Icon = ICON_MAP[cat.icon] ?? Globe;
+              const isOpen = expandedCategory === cat.name;
+              return (
+                <div
+                  key={cat.name}
+                  className="rounded-xl border border-border bg-card overflow-hidden"
+                >
+                  <button
+                    onClick={() =>
+                      setExpandedCategory(isOpen ? null : cat.name)
+                    }
+                    className="flex w-full items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="font-medium text-sm flex-1 text-left">
+                      {cat.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {cat.sites.length} sites
+                    </span>
+                    {isOpen ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  {isOpen && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 pt-0">
+                      {cat.sites.map((site) => (
+                        <button
+                          key={site.url}
+                          onClick={() => navigate(tab.id, site.url)}
+                          className="group flex items-center gap-2.5 rounded-lg border border-border bg-background hover:bg-accent hover:border-emerald-500/30 transition-all p-2.5 text-left"
+                        >
+                          <img
+                            src={faviconFor(site.url)}
+                            alt=""
+                            className="h-5 w-5 rounded-sm flex-shrink-0"
+                            onError={(e) =>
+                              ((e.target as HTMLImageElement).style.visibility =
+                                "hidden")
+                            }
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium truncate">
+                              {site.name}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {hostnameOf(site.url)}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Quick links */}
         <div className="mb-10">
@@ -112,7 +225,9 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
                 onDelete={
                   quickLinks.length
                     ? () => {
-                        fetch(`/api/quicklinks?id=${link.id}`, { method: "DELETE" });
+                        fetch(`/api/quicklinks?id=${link.id}`, {
+                          method: "DELETE",
+                        });
                         removeQuickLink(link.id);
                       }
                     : undefined
@@ -140,13 +255,18 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
                     src={h.favicon || faviconFor(h.url)}
                     alt=""
                     className="h-5 w-5 rounded-sm flex-shrink-0"
-                    onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")}
+                    onError={(e) =>
+                      ((e.target as HTMLImageElement).style.visibility =
+                        "hidden")
+                    }
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">
                       {h.title || hostnameOf(h.url)}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate">{hostnameOf(h.url)}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {hostnameOf(h.url)}
+                    </p>
                   </div>
                 </button>
               ))}
@@ -158,9 +278,14 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
         <div className="mt-12 text-center">
           <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-            Press <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">Ctrl</kbd>
+            Press{" "}
+            <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+              Ctrl
+            </kbd>
             <span>+</span>
-            <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">K</kbd>
+            <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">
+              K
+            </kbd>
             for the command palette
           </p>
         </div>
@@ -271,12 +396,4 @@ function QuickLinkTile({
       )}
     </div>
   );
-}
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 5) return "Good night";
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
 }

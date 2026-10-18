@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sun, Moon, Monitor, Shield, Globe, Trash2, Info } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { BROWSER_PROFILES } from "@/lib/browser-profiles";
 
 export function SettingsDialog() {
   const open = useProxyStore((s) => s.settingsOpen);
@@ -56,6 +57,7 @@ function SettingsBody() {
         searchEngine: next.searchEngine,
         showBookmarksBar: String(next.showBookmarksBar),
         theme: next.theme,
+        browserProfile: next.browserProfile,
       }),
     });
   };
@@ -64,6 +66,11 @@ function SettingsBody() {
     await fetch("/api/history?all=1", { method: "DELETE" });
     setHistory([]);
     toast({ title: "All history cleared" });
+  };
+
+  const clearCookies = async () => {
+    await fetch("/api/proxy/clear", { method: "POST" });
+    toast({ title: "Cookies & sessions cleared" });
   };
 
   return (
@@ -121,6 +128,35 @@ function SettingsBody() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 Used when you type a search query (not a URL) into the address bar.
+              </p>
+            </section>
+
+            <Separator />
+
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-emerald-500" />
+                <h3 className="text-sm font-semibold">Browser profile</h3>
+              </div>
+              <Select
+                value={local.browserProfile}
+                onValueChange={(v) => save({ browserProfile: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BROWSER_PROFILES.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                The User-Agent and browser headers sent to websites. If a site
+                blocks one profile, try another — some sites reject non-Chrome
+                or mobile UAs.
               </p>
             </section>
 
@@ -198,6 +234,18 @@ function SettingsBody() {
               </div>
               <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
                 <div>
+                  <p className="text-sm font-medium">Cookies &amp; sessions</p>
+                  <p className="text-xs text-muted-foreground">
+                    Clear stored proxy cookies (forces re-login on all sites)
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={clearCookies}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  Clear
+                </Button>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <div>
                   <p className="text-sm font-medium">Incognito tabs</p>
                   <p className="text-xs text-muted-foreground">
                     Incognito tabs never record history or bookmarks
@@ -233,13 +281,17 @@ function SettingsBody() {
                 <Info className="h-4 w-4" /> Features
               </div>
               <ul className="space-y-1 text-xs text-muted-foreground list-disc pl-5">
+                <li>Website unblocker with category shortcuts</li>
+                <li>7 browser profiles (Chrome, Firefox, Safari, Edge, mobile)</li>
+                <li>Cookie &amp; session forwarding (logins persist)</li>
                 <li>Multi-tab browsing with per-tab history</li>
                 <li>Incognito mode</li>
-                <li>Bookmarks & quick links</li>
+                <li>Bookmarks &amp; quick links</li>
                 <li>Searchable history grouped by day</li>
                 <li>Command palette (Ctrl+K)</li>
                 <li>Light / dark / system theme</li>
                 <li>HTML, CSS &amp; JS rewriting engine</li>
+                <li>GET &amp; POST form submissions through the proxy</li>
                 <li>Keyboard shortcuts</li>
               </ul>
             </section>

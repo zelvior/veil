@@ -5,13 +5,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const DEFAULTS: Record<string, string> = {
-  searchEngine:
-    "https://duckduckgo.com/?q={q}",
-  userAgent: "default",
+  searchEngine: "https://duckduckgo.com/?q={q}",
+  browserProfile: "chrome-win",
   theme: "system",
-  blockScripts: "false",
-  stripCookies: "false",
-  newTabBackground: "false",
   showBookmarksBar: "true",
 };
 

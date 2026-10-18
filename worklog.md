@@ -197,3 +197,81 @@ Stage Summary:
   4. **Edge streaming & error handling**: ReadableStream piping for media (verified 206 Range support), styled error pages for 403/404/500/502/408 with status-specific icons.
 - Agent Browser verified: example.com ✓, Hacker News ✓ (full stories), BBC News ✓ (full nav, no tracker requests fired).
 - `bun run lint` passes clean; dev server runs with no errors.
+
+---
+Task ID: 5
+Agent: main (Z.ai Code)
+Task: Integrate Zelvior Labs branding, attribution, official links, and metadata across the entire codebase.
+
+Work Log:
+- Updated `package.json`:
+  - `name`: "veil" (was "nextjs_tailwind_shadcn_ts")
+  - `version`: "1.0.0"
+  - `author`: "Zelvior <zelvior@proton.me> (https://linktr.ee/zelvior)"
+  - `license`: "Apache-2.0"
+  - `homepage`: "https://github.com/zelvior/veil"
+  - `repository`: { type: "git", url: "https://github.com/zelvior/veil.git" }
+  - `bugs`: { url: "https://github.com/zelvior/veil/issues", email: "zelvior@proton.me" }
+  - `keywords`: 14 keywords (veil, zelvior, zelvior-labs, web-proxy, proxy, unblocker, privacy, etc.)
+  - `description`: full project description
+- Updated `src/app/layout.tsx` metadata:
+  - `title`: "Veil — Private Web Proxy Browser by Zelvior Labs" (with template)
+  - `description`: mentions Zelvior Labs, Next.js 16, unblock, privacy features
+  - `authors`: [{ name: "Zelvior", url: "https://linktr.ee/zelvior" }]
+  - `creator`: "Zelvior"
+  - `publisher`: "Zelvior Labs"
+  - `openGraph`: full OG tags (title, description, url, siteName, locale, image 1200x630)
+  - `twitter`: card=summary_large_image, creator=@zelviorhere, title, description, image
+  - `applicationName`: "Veil"
+  - `metadataBase`: https://github.com/zelvior/veil
+  - `keywords`: 11 keywords
+  - `robots`: index+follow
+- Added brand icons to `src/components/icons.tsx`:
+  - `DiscordIcon` — Discord logo SVG
+  - `YoutubeIcon` — YouTube logo SVG
+  - `LinktreeIcon` — Linktree logo SVG
+- Upgraded footer in `src/components/proxy/browser-shell.tsx`:
+  - Dark zinc-950 background with emerald accent (clean dark-mode aesthetic)
+  - Left: Shield icon + "Veil" + "Built by Zelvior Labs" (link to linktr.ee/zelvior) + incognito badge + proxy status
+  - Right: "Apache 2.0" label + 4 social icon links (GitHub, Discord, Linktree, YouTube) with hover-emerald color transition
+  - All links verified correct: github.com/zelvior/veil, discord.gg/UQfzQzymc, linktr.ee/zelvior, youtube.com/@zelviorhere
+- Created `README.md` (354 lines):
+  - Centered header with project name, tagline, description
+  - 8 badges: License (Apache 2.0), Next.js 16, TypeScript, Tailwind, Prisma, shadcn/ui, GitHub stars/forks/issues/PRs
+  - 5 quick-nav links (Website, Docs, Discord, YouTube, Linktree)
+  - Overview section with key highlights
+  - Full features list (Core Engine, Security, Client Interceptor, Browser UI, Unblocker)
+  - Tech stack table
+  - Installation instructions (clone, install, db setup, dev, build)
+  - Usage guide with keyboard shortcuts table
+  - Project structure tree
+  - Security architecture diagram (10-step request flow)
+  - Privacy layers table
+  - Contributing guide
+  - Apache 2.0 license notice with copyright "Zelvior Labs"
+  - Author section with 7 badges (GitHub, ORCID, Email, NPM, YouTube, Linktree, Discord)
+  - Acknowledgments
+  - Support section
+  - Footer with copyright
+- Created `LICENSE` (201 lines): full Apache 2.0 license text with "Copyright 2024 Zelvior Labs" notice
+
+Stage Summary:
+- All branding fully integrated across the codebase:
+  1. ✅ Footer/UI Branding: dark-mode footer with "Built by Zelvior Labs" + GitHub/Discord/Linktree/YouTube icon links
+  2. ✅ Metadata & OpenGraph: full OG tags, Twitter cards, author=Zelvior, publisher=Zelvior Labs
+  3. ✅ README.md: professional 354-line README with badges, features, install, credits, Apache 2.0 notice
+  4. ✅ package.json: author, repository, homepage, license, bugs, keywords all updated
+  5. ✅ LICENSE: full Apache 2.0 text with Zelvior Labs copyright
+- Agent Browser verified: footer renders with all 5 links, page title shows "by Zelvior Labs", meta tags correct in page source
+- `bun run lint` passes clean; dev server runs with no errors
+- All official links embedded:
+  - Creator: Zelvior
+  - Organization: Zelvior Labs
+  - Email: zelvior@proton.me (package.json author + README badge)
+  - GitHub: https://github.com/zelvior/veil (footer + package.json + metadata + README)
+  - License: Apache 2.0 (package.json + LICENSE file + README + footer)
+  - NPM: https://www.npmjs.com/~zelnpm (README badge)
+  - ORCID: https://orcid.org/0009-0009-2376-367X (README badge)
+  - YouTube: https://youtube.com/@zelviorhere (footer + metadata twitter creator + README badge)
+  - Linktree: https://linktr.ee/zelvior (footer "Zelvior Labs" link + package.json + README badge)
+  - Discord: https://discord.gg/UQfzQzymc (footer + README badge + header quick-nav)

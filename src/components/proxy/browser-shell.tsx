@@ -10,7 +10,7 @@ import { Sidebar } from "./sidebar";
 import { CommandPalette } from "./command-palette";
 import { SettingsDialog } from "./settings-dialog";
 import { hostnameOf } from "@/lib/proxy";
-import { Shield, Github } from "@/components/icons";
+import { Shield, Github, DiscordIcon, YoutubeIcon, LinktreeIcon } from "@/components/icons";
 
 export function BrowserShell() {
   const tabs = useProxyStore((s) => s.tabs);
@@ -155,31 +155,73 @@ export function BrowserShell() {
 }
 
 function Footer({ tab }: { tab: { url: string; title: string; incognito: boolean } | undefined }) {
+  const socialLinks = [
+    {
+      href: "https://github.com/zelvior/veil",
+      label: "GitHub",
+      icon: <Github className="h-3.5 w-3.5" />,
+    },
+    {
+      href: "https://discord.gg/UQfzQzymc",
+      label: "Discord",
+      icon: <DiscordIcon className="h-3.5 w-3.5" />,
+    },
+    {
+      href: "https://linktr.ee/zelvior",
+      label: "Linktree",
+      icon: <LinktreeIcon className="h-3.5 w-3.5" />,
+    },
+    {
+      href: "https://youtube.com/@zelviorhere",
+      label: "YouTube",
+      icon: <YoutubeIcon className="h-3.5 w-3.5" />,
+    },
+  ];
+
   return (
-    <footer className="flex items-center justify-between border-t border-border bg-background px-3 py-1 text-[11px] text-muted-foreground">
+    <footer className="flex items-center justify-between border-t border-border bg-zinc-950 px-3 py-1.5 text-[11px] text-zinc-400 dark:text-zinc-400">
+      {/* Left: proxy status */}
       <div className="flex items-center gap-2 min-w-0">
         <Shield className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
-        <span className="font-medium text-foreground/80">Veil Proxy</span>
+        <span className="font-semibold text-zinc-200">Veil</span>
+        <span className="text-zinc-600">·</span>
+        <span className="hidden sm:inline text-zinc-500">
+          Built by{" "}
+          <a
+            href="https://linktr.ee/zelvior"
+            target="_blank"
+            rel="noreferrer"
+            className="text-zinc-300 hover:text-emerald-400 transition-colors font-medium"
+          >
+            Zelvior Labs
+          </a>
+        </span>
         {tab?.incognito && (
-          <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-600 dark:text-violet-400">
+          <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-400">
             Incognito
           </span>
         )}
-        <span className="hidden sm:inline truncate">
-          {tab?.url ? `Proxied · ${hostnameOf(tab.url)}` : "Ready"}
+        <span className="hidden md:inline truncate text-zinc-500">
+          {tab?.url ? `· Proxied · ${hostnameOf(tab.url)}` : "· Ready"}
         </span>
       </div>
-      <div className="flex items-center gap-3">
-        <span className="hidden md:inline">Next.js 16 · Prisma · shadcn/ui</span>
-        <a
-          href="https://nextjs.org"
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1 hover:text-foreground"
-        >
-          <Github className="h-3 w-3" />
-          <span className="hidden sm:inline">Docs</span>
-        </a>
+
+      {/* Right: social links */}
+      <div className="flex items-center gap-0.5">
+        <span className="hidden lg:inline text-zinc-600 mr-2">Apache 2.0</span>
+        {socialLinks.map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            target="_blank"
+            rel="noreferrer"
+            title={link.label}
+            aria-label={link.label}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 transition-all hover:text-emerald-400 hover:bg-zinc-800"
+          >
+            {link.icon}
+          </a>
+        ))}
       </div>
     </footer>
   );

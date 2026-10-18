@@ -1,7 +1,35 @@
 {
-  "name": "nextjs_tailwind_shadcn_ts",
-  "version": "0.2.1",
+  "name": "veil",
+  "version": "1.0.0",
   "private": true,
+  "description": "Veil — A feature-rich, privacy-first web proxy browser built with Next.js 16. Unblock websites, browse anonymously, and stream media through a high-performance proxy engine.",
+  "author": "Zelvior <zelvior@proton.me> (https://linktr.ee/zelvior)",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/zelvior/veil",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zelvior/veil.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zelvior/veil/issues",
+    "email": "zelvior@proton.me"
+  },
+  "keywords": [
+    "veil",
+    "zelvior",
+    "zelvior-labs",
+    "web-proxy",
+    "proxy",
+    "unblocker",
+    "privacy",
+    "anonymous-browsing",
+    "nextjs",
+    "nextjs-16",
+    "typescript",
+    "tailwindcss",
+    "shadcn-ui",
+    "prisma"
+  ],
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",

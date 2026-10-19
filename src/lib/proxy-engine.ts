@@ -32,6 +32,9 @@ import {
 } from "./proxy";
 import { getProfile } from "./browser-profiles";
 import { stripTrackersFromHtml } from "./tracker-blocker";
+import { buildCosmeticCSS } from "./blocklist";
+import { neutralizeRedirects, buildRedirectInterceptor } from "./redirect-blocker";
+import { buildTrafficMaskScript } from "./traffic-mask";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -42,6 +45,12 @@ export interface RewriteHtmlOptions {
   baseUrl: string;
   proxyOrigin: string;
   profileId?: string | null;
+  /** Whether to block auto-redirects (inject redirect interceptor). */
+  blockRedirects?: boolean;
+  /** Whether to apply cosmetic ad-hiding CSS filters. */
+  blockAds?: boolean;
+  /** Whether to inject the traffic mask script. */
+  trafficMask?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -324,15 +333,55 @@ export function rewriteHtml(opts: RewriteHtmlOptions): string {
   // the original target domain against the tracker blocklist.
   stripTrackersFromHtml($);
 
+  // Apply cosmetic ad-hiding CSS filters (hides ad elements that are
+  // served from the same domain and can't be blocked at the network level).
+  if (opts.blockAds !== false) {
+    const cosmeticStyle = `<style id="__veil_cosmetic_filters">${buildCosmeticCSS()}</style>`;
+    const head = $("head");
+    if (head.length) head.append(cosmeticStyle);
+    else $.root().append(cosmeticStyle);
+  }
+
+  // Neutralize auto-redirects in the HTML (meta refresh, inline location.href).
+  // This is a server-side pass that removes/neutralizes redirect mechanisms.
+  if (opts.blockRedirects) {
+    const neutralized = neutralizeRedirects($.html(), baseUrl);
+    // Re-parse the neutralized HTML
+    const $2 = cheerio.load(neutralized, { decodeEntities: false });
+    // Replace $'s content with $2's content
+    // (cheerio doesn't have a direct "replace root" method, so we work with $2)
+    // We need to re-do the injection below with $2.
+    // Actually, let's just modify the html string before returning.
+    // The simplest approach: neutralizeRedirects already modified the HTML
+    // string, and we've already done all cheerio operations. So we can
+    // just return the neutralized HTML after adding the interceptor.
+    // But wait — we need the interceptor injected into the neutralized HTML.
+    // Let's just re-load and re-inject.
+    const interceptor = buildInterceptorScript(baseUrl, proxyOrigin, profileId);
+    const redirectInterceptor = buildRedirectInterceptor(baseUrl);
+    const trafficMask = buildTrafficMaskScript(opts.trafficMask ?? false);
+
+    // Inject all scripts into the neutralized HTML
+    const $3 = cheerio.load(neutralized, { decodeEntities: false });
+    const head3 = $3("head");
+    const allScripts = redirectInterceptor + trafficMask + interceptor;
+    if (head3.length) {
+      head3.prepend(allScripts);
+    } else {
+      $3("html").prepend(allScripts);
+    }
+    return $3.html();
+  }
+
   // Inject the interceptor script as the FIRST element in <head>, so it
   // runs before any page scripts that might call fetch/XHR.
   const interceptor = buildInterceptorScript(baseUrl, proxyOrigin, profileId);
+  const trafficMask = buildTrafficMaskScript(opts.trafficMask ?? false);
   const head = $("head");
   if (head.length) {
-    head.prepend(interceptor);
+    head.prepend(trafficMask + interceptor);
   } else {
-    // No <head> — prepend to <html> or the document root.
-    $("html").prepend(interceptor);
+    $("html").prepend(trafficMask + interceptor);
   }
 
   return $.html();

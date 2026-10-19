@@ -113,6 +113,20 @@ export default function CookiesPage() {
         for functionality. Use the "Clear Cookies" feature to fully reset.
       </p>
 
+      <h3>Local Data (IndexedDB)</h3>
+      <p>
+        In addition to cookies, Veil stores your <strong>browsing history,
+        bookmarks, quick links, and settings</strong> in your browser's{" "}
+        <strong>IndexedDB</strong>. This is client-side storage — the data
+        never leaves your device and is not accessible to our servers. To
+        clear it:
+      </p>
+      <ul>
+        <li>Use <strong>Settings → Privacy → Clear History</strong> to clear browsing history</li>
+        <li>Use your browser's "Clear browsing data" → "Site data" to clear all IndexedDB</li>
+        <li>Or open DevTools → Application → IndexedDB → "veil-browser" to inspect/clear</li>
+      </ul>
+
       <h2>6. Tracker Cookies</h2>
       <p>
         Veil's tracker blocking engine prevents <strong>40+ known tracker

@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useProxyStore } from "@/store/proxy-store";
+import { ShieldOff } from "lucide-react";
+import { persistBookmark, deleteBookmark } from "@/hooks/use-indexeddb-sync";
 import {
   ArrowLeft,
   ArrowRight,
@@ -65,25 +67,24 @@ export function NavigationBar() {
     if (isBookmarked) {
       const b = bookmarks.find((x) => x.url === tab.url);
       if (b) {
-        await fetch(`/api/bookmarks?id=${b.id}`, { method: "DELETE" });
+        await deleteBookmark(b.id);
         removeBookmark(b.id);
         toast({ title: "Bookmark removed" });
       }
     } else {
-      const res = await fetch("/api/bookmarks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: tab.url,
-          title: tab.title || hostnameOf(tab.url),
-          favicon: faviconFor(tab.url),
-        }),
+      const entry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        url: tab.url,
+        title: tab.title || hostnameOf(tab.url),
+        favicon: faviconFor(tab.url),
+      };
+      addBookmark(entry);
+      await persistBookmark({
+        url: tab.url,
+        title: tab.title || hostnameOf(tab.url),
+        favicon: faviconFor(tab.url),
       });
-      const data = await res.json();
-      if (data.item) {
-        addBookmark(data.item);
-        toast({ title: "Bookmarked", description: hostnameOf(tab.url) });
-      }
+      toast({ title: "Bookmarked", description: hostnameOf(tab.url) });
     }
   };
 
@@ -118,6 +119,9 @@ export function NavigationBar() {
       <NavButton onClick={() => tab && goHome(tab.id)} title="Home">
         <House className="h-4 w-4" />
       </NavButton>
+
+      {/* Proxy on/off toggle */}
+      <ProxyToggleButton />
 
       {/* Address bar */}
       <form onSubmit={submit} className="flex-1 min-w-0 mx-1">
@@ -281,6 +285,36 @@ function NavButton({
       )}
     >
       {children}
+    </button>
+  );
+}
+
+/**
+ * Proxy on/off toggle button.
+ * When ON (green shield): requests route through the proxy server.
+ * When OFF (gray): requests load directly from the target site (no privacy).
+ */
+function ProxyToggleButton() {
+  const proxyEnabled = useProxyStore((s) => s.settings.proxyEnabled);
+  const setSettings = useProxyStore((s) => s.setSettings);
+
+  return (
+    <button
+      onClick={() => setSettings({ proxyEnabled: !proxyEnabled })}
+      title={proxyEnabled ? "Proxy: ON (click to disable)" : "Proxy: OFF (click to enable)"}
+      className={cn(
+        "flex h-8 items-center gap-1.5 rounded-full px-2.5 transition-all text-xs font-medium",
+        proxyEnabled
+          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+          : "bg-muted text-muted-foreground hover:bg-accent"
+      )}
+    >
+      {proxyEnabled ? (
+        <Shield className="h-3.5 w-3.5" />
+      ) : (
+        <ShieldOff className="h-3.5 w-3.5" />
+      )}
+      <span className="hidden sm:inline">{proxyEnabled ? "Proxy" : "Direct"}</span>
     </button>
   );
 }

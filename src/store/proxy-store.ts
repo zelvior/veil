@@ -54,7 +54,48 @@ export interface Settings {
   browserProfile: string;
   theme: "light" | "dark" | "system";
   showBookmarksBar: boolean;
+  /** Whether the proxy is enabled (on/off toggle). */
+  proxyEnabled: boolean;
+  /** Whether auto-redirect blocking is enabled. */
+  blockRedirects: boolean;
+  /** Whether ad blocking is enabled (expanded blocklist + cosmetic filters). */
+  blockAds: boolean;
+  /** Whether traffic masking is enabled (timing randomization + decoy requests). */
+  trafficMask: boolean;
+  /** Accent color for the UI. */
+  accentColor: AccentColor;
+  /** UI density: compact = smaller padding, comfortable = default, spacious = larger. */
+  density: "compact" | "comfortable" | "spacious";
+  /** Font family for the UI. */
+  fontFamily: "system" | "inter" | "geistsans" | "geistmono" | "serif";
+  /** Whether to show the status bar in the footer. */
+  showStatusBar: boolean;
+  /** Whether to show favicons in the tab bar. */
+  showFavicons: boolean;
+  /** Custom homepage URL (empty = new tab page). */
+  homepage: string;
 }
+
+export type AccentColor =
+  | "emerald"
+  | "blue"
+  | "violet"
+  | "rose"
+  | "amber"
+  | "cyan"
+  | "orange"
+  | "pink";
+
+export const ACCENT_COLORS: Record<AccentColor, { name: string; value: string; rgb: string }> = {
+  emerald: { name: "Emerald", value: "#10b981", rgb: "16, 185, 129" },
+  blue: { name: "Blue", value: "#3b82f6", rgb: "59, 130, 246" },
+  violet: { name: "Violet", value: "#8b5cf6", rgb: "139, 92, 246" },
+  rose: { name: "Rose", value: "#f43f5e", rgb: "244, 63, 94" },
+  amber: { name: "Amber", value: "#f59e0b", rgb: "245, 158, 11" },
+  cyan: { name: "Cyan", value: "#06b6d4", rgb: "6, 182, 212" },
+  orange: { name: "Orange", value: "#f97316", rgb: "249, 115, 22" },
+  pink: { name: "Pink", value: "#ec4899", rgb: "236, 72, 153" },
+};
 
 const SEARCH_ENGINES: Record<string, string> = {
   duckduckgo: "https://duckduckgo.com/?q={q}",
@@ -168,6 +209,16 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
     browserProfile: DEFAULT_PROFILE_ID,
     theme: "system",
     showBookmarksBar: true,
+    proxyEnabled: true,
+    blockRedirects: true,
+    blockAds: true,
+    trafficMask: false,
+    accentColor: "emerald",
+    density: "comfortable",
+    fontFamily: "system",
+    showStatusBar: true,
+    showFavicons: true,
+    homepage: "",
   },
 
   newTab: (url, incognito = false) => {

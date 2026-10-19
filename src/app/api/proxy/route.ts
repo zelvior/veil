@@ -170,20 +170,38 @@ function pumpStream(upstreamBody: ReadableStream<Uint8Array>): ReadableStream<Ui
  */
 function parseTargetUrl(
   searchParams: URLSearchParams
-): { targetUrl: string; extraParams: URLSearchParams } {
+): {
+  targetUrl: string;
+  extraParams: URLSearchParams;
+  blockRedirects: boolean;
+  blockAds: boolean;
+  trafficMask: boolean;
+} {
   const raw = searchParams.get("url");
-  if (!raw) return { targetUrl: "", extraParams: new URLSearchParams() };
+  if (!raw)
+    return {
+      targetUrl: "",
+      extraParams: new URLSearchParams(),
+      blockRedirects: true,
+      blockAds: true,
+      trafficMask: false,
+    };
 
   const targetUrl = decodeUrl(raw);
 
+  // Read feature flags from query params (sent by the client).
+  const blockRedirects = searchParams.get("br") !== "0"; // default true
+  const blockAds = searchParams.get("ba") !== "0"; // default true
+  const trafficMask = searchParams.get("tm") === "1"; // default false
+
   // Collect extra params to forward (everything except our own control params).
   const extra = new URLSearchParams();
-  const skip = new Set(["url", "ua"]);
+  const skip = new Set(["url", "ua", "br", "ba", "tm"]);
   searchParams.forEach((v, k) => {
     if (!skip.has(k)) extra.append(k, v);
   });
 
-  return { targetUrl, extraParams: extra };
+  return { targetUrl, extraParams: extra, blockRedirects, blockAds, trafficMask };
 }
 
 /**
@@ -230,7 +248,7 @@ export async function GET(req: NextRequest) {
   // decide to merge incoming headers.
   anonymizeIncomingHeaders(req.headers);
 
-  const { targetUrl, extraParams } = parseTargetUrl(req.nextUrl.searchParams);
+  const { targetUrl, extraParams, blockRedirects, blockAds, trafficMask } = parseTargetUrl(req.nextUrl.searchParams);
   if (!targetUrl) {
     return NextResponse.json(
       { error: "Missing ?url= parameter" },
@@ -369,6 +387,9 @@ export async function GET(req: NextRequest) {
         baseUrl: finalUrl,
         proxyOrigin,
         profileId,
+        blockRedirects,
+        blockAds,
+        trafficMask,
       });
       const headers = normalizeResponseHeaders(upstream.headers, {
         rewritten: true,
@@ -478,7 +499,7 @@ export async function POST(req: NextRequest) {
   const session = getOrCreateSession(sessionId);
   anonymizeIncomingHeaders(req.headers);
 
-  const { targetUrl } = parseTargetUrl(req.nextUrl.searchParams);
+  const { targetUrl, blockRedirects, blockAds, trafficMask } = parseTargetUrl(req.nextUrl.searchParams);
   if (!targetUrl) {
     return NextResponse.json(
       { error: "Missing ?url= parameter" },
@@ -549,6 +570,9 @@ export async function POST(req: NextRequest) {
       baseUrl: finalUrl,
       proxyOrigin,
       profileId,
+      blockRedirects: blockRedirects,
+      blockAds: blockAds,
+      trafficMask: trafficMask,
     });
     const headers = normalizeResponseHeaders(upstream.headers, {
       rewritten: true,
@@ -595,7 +619,7 @@ async function forwardWithBody(
   const session = getOrCreateSession(sessionId);
   anonymizeIncomingHeaders(req.headers);
 
-  const { targetUrl } = parseTargetUrl(req.nextUrl.searchParams);
+  const { targetUrl, blockRedirects, blockAds, trafficMask } = parseTargetUrl(req.nextUrl.searchParams);
   if (!targetUrl) {
     return NextResponse.json(
       { error: "Missing ?url= parameter" },

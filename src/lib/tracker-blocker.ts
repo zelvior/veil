@@ -13,6 +13,7 @@
  */
 
 import * as cheerio from "cheerio";
+import { isBlockedDomain } from "./blocklist";
 import { isTrackerDomain } from "./security-utils";
 
 /* ------------------------------------------------------------------ */
@@ -58,7 +59,7 @@ export function stripTrackersFromHtml($: cheerio.CheerioAPI): number {
       const originalUrl = decodeProxyUrl(val);
       if (!originalUrl) return;
 
-      if (isTrackerDomain(originalUrl)) {
+      if (isBlockedDomain(originalUrl) || isTrackerDomain(originalUrl)) {
         node.remove();
         removed++;
       }
@@ -72,7 +73,7 @@ export function stripTrackersFromHtml($: cheerio.CheerioAPI): number {
   $('link[rel="preconnect"], link[rel="dns-prefetch"]').each((_, el) => {
     const node = $(el);
     const href = node.attr("href");
-    if (href && isTrackerDomain(href)) {
+    if (href && (isBlockedDomain(href) || isTrackerDomain(href))) {
       node.remove();
       removed++;
     }
@@ -157,7 +158,8 @@ function stripTrackerInlineScripts($: cheerio.CheerioAPI): number {
  * be blocked.
  */
 export function isTrackerRequest(targetUrl: string): boolean {
-  return isTrackerDomain(targetUrl);
+  // Check both the expanded blocklist and the legacy tracker domain list
+  return isBlockedDomain(targetUrl) || isTrackerDomain(targetUrl);
 }
 
 /**

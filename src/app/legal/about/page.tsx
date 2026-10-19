@@ -47,15 +47,107 @@ export default function AboutPage() {
       <ul>
         <li><strong>Multi-tab browsing</strong> with per-tab history and incognito mode</li>
         <li><strong>7 browser profiles</strong> — Chrome, Firefox, Safari, Edge (desktop &amp; mobile)</li>
-        <li><strong>Tracker blocking</strong> — 40+ ad/analytics domains blocked</li>
+        <li><strong>Ad &amp; tracker blocking</strong> — 200+ domains blocked + cosmetic CSS filters</li>
+        <li><strong>Auto-redirect blocking</strong> — blocks unwanted redirects with permission prompts</li>
+        <li><strong>Traffic mask</strong> — timing randomization, decoy requests, header shuffling</li>
         <li><strong>WebRTC IP leak prevention</strong> — RTCPeerConnection neutralized</li>
         <li><strong>Cookie session isolation</strong> — per-user ephemeral sessions</li>
         <li><strong>Streaming media</strong> — zero-buffer video/audio with Range seeking</li>
         <li><strong>Command palette</strong> (Ctrl+K) — fuzzy search across actions, history, bookmarks</li>
         <li><strong>Website unblocker</strong> — 34 popular sites across 6 categories</li>
-        <li><strong>Light/Dark/System themes</strong></li>
+        <li><strong>Light/Dark/System themes</strong> + <strong>8 accent colors</strong></li>
+        <li><strong>Full appearance customization</strong> — themes, accent colors, fonts, density, UI toggles</li>
+        <li><strong>Proxy on/off toggle</strong> — switch between proxied and direct browsing</li>
+        <li><strong>IndexedDB storage</strong> — all data stored client-side, never on servers</li>
+        <li><strong>PWA</strong> — installable, offline-capable, service worker</li>
         <li><strong>Fully responsive</strong> — mobile-first design</li>
       </ul>
+
+      <h2>Auto-Redirect Blocking</h2>
+      <p>
+        Veil blocks automatic redirects that websites perform without user
+        consent — including <code>&lt;meta http-equiv="refresh"&gt;</code>,
+        <code>window.location.href</code>, <code>location.assign/replace</code>,
+        and timer-based redirects. When a redirect is detected, Veil{" "}
+        <strong>asks for permission</strong> before allowing it. You can:
+      </p>
+      <ul>
+        <li><strong>Allow once</strong> — let this single redirect through</li>
+        <li><strong>Allow always</strong> — trust this domain to redirect (saved in IndexedDB)</li>
+        <li><strong>Block</strong> — prevent the redirect</li>
+      </ul>
+      <p>
+        Toggle this feature in <strong>Settings → Privacy → Advanced Protection</strong>.
+      </p>
+
+      <h2>Ad &amp; Tracker Blocking (Maxed Out)</h2>
+      <p>
+        Veil&apos;s ad blocking is maxed out with a{" "}
+        <strong>200+ domain blocklist</strong> covering:
+      </p>
+      <ul>
+        <li><strong>Ad networks:</strong> DoubleClick, Google AdSense, AdNexus, Criteo, Taboola, Outbrain, and 50+ more</li>
+        <li><strong>Trackers:</strong> Google Analytics, Facebook Pixel, Hotjar, Mixpanel, Amplitude, and 30+ more</li>
+        <li><strong>Telemetry:</strong> Reddit events, SoundCloud telemetry, TikTok analytics, Adobe telemetry</li>
+        <li><strong>Fingerprinting:</strong> FingerprintJS, Iovation, Sift, ThreatMetRIX, reCAPTCHA</li>
+        <li><strong>Crypto mining:</strong> CoinHive, CryptoLoot, WebMine, and 20+ more</li>
+        <li><strong>Malware:</strong> TrafficJunky, ExoClick, JuicyAds, and other malicious ad networks</li>
+      </ul>
+      <p>
+        In addition to network-level blocking, Veil applies{" "}
+        <strong>cosmetic CSS filters</strong> that hide ad elements served from
+        the same domain (ad containers, sponsored content, cookie banners,
+        paywall overlays, and newsletter popups).
+      </p>
+
+      <h2>Traffic Mask</h2>
+      <p>
+        The traffic mask feature adds noise to your browsing traffic to
+        prevent traffic analysis:
+      </p>
+      <ul>
+        <li><strong>Request timing randomization</strong> — 0-200ms random delays between sub-resource requests</li>
+        <li><strong>Decoy requests</strong> — Periodically fetches common resources (favicon.ico, robots.txt) to add noise</li>
+        <li><strong>Header shuffling</strong> — Randomizes non-critical header order and adds padding headers</li>
+        <li><strong>WebSocket timing</strong> — Randomizes WebSocket connection timing</li>
+      </ul>
+      <p>
+        Toggle in <strong>Settings → Privacy → Advanced Protection</strong>.
+        Note: traffic mask may slightly slow down page loads.
+      </p>
+
+      <h2>Appearance Customization</h2>
+      <p>
+        Veil lets you fully customize the browser's appearance via{" "}
+        <strong>Settings → Appearance</strong>:
+      </p>
+      <ul>
+        <li><strong>Theme:</strong> Light, Dark, or System (follows your OS preference)</li>
+        <li><strong>Accent color:</strong> 8 colors (Emerald, Blue, Violet, Rose, Amber, Cyan, Orange, Pink)</li>
+        <li><strong>Font:</strong> System UI, Inter, Geist Sans, Geist Mono, or Serif</li>
+        <li><strong>Density:</strong> Compact, Comfortable, or Spacious (controls padding/spacing)</li>
+        <li><strong>UI toggles:</strong> Show/hide status bar, show/hide favicons in tabs</li>
+      </ul>
+      <p>
+        All appearance settings are stored in IndexedDB and persist across
+        sessions. The accent color is applied via CSS custom properties, so
+        the entire UI (buttons, links, highlights, badges) updates instantly.
+      </p>
+
+      <h2>Proxy Toggle</h2>
+      <p>
+        A shield icon in the navigation bar lets you{" "}
+        <strong>toggle the proxy on or off</strong> at any time:
+      </p>
+      <ul>
+        <li><strong>ON (green shield):</strong> All requests route through the proxy server — your IP is hidden, trackers are blocked, WebRTC is neutralized</li>
+        <li><strong>OFF (gray shield):</strong> Pages load directly from the target site — faster, but no privacy protection</li>
+      </ul>
+      <p>
+        This is useful when the proxy is slow, when a site blocks proxy
+        traffic, or when you need to test direct access. The toggle state
+        is saved in IndexedDB.
+      </p>
 
       <h2>Tech Stack</h2>
       <table>

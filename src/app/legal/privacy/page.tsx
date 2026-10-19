@@ -33,12 +33,45 @@ export default function PrivacyPage() {
       <p>We explicitly do <strong>not</strong> collect or store:</p>
       <ul>
         <li>Your real IP address or geolocation</li>
-        <li>Your browsing history (stored locally in your browser via Prisma/SQLite)</li>
-        <li>Your bookmarks or quick links (stored locally)</li>
+        <li>Your browsing history (stored locally in your browser via <strong>IndexedDB</strong> — never on our servers)</li>
+        <li>Your bookmarks or quick links (stored locally via IndexedDB)</li>
+        <li>Your settings and preferences (stored locally via IndexedDB)</li>
         <li>The content of pages you visit</li>
         <li>Personal identification information</li>
         <li>Analytics or telemetry data (we block our own trackers too)</li>
       </ul>
+
+      <h2>2a. Local Storage — IndexedDB</h2>
+      <p>
+        All user data — browsing history, bookmarks, quick links, and
+        settings — is stored exclusively in your browser using{" "}
+        <strong>IndexedDB</strong>, a client-side database that persists
+        across sessions. This data <strong>never leaves your device</strong>{" "}
+        and is <strong>never sent to our servers</strong>.
+      </p>
+      <ul>
+        <li><strong>History:</strong> URLs, titles, favicons, and timestamps of pages you visit</li>
+        <li><strong>Bookmarks:</strong> Saved page URLs and titles</li>
+        <li><strong>Quick Links:</strong> Custom shortcuts on the new-tab page</li>
+        <li><strong>Settings:</strong> Theme, accent color, font, density, proxy toggle, browser profile, search engine</li>
+      </ul>
+      <p>
+        You can clear all local data at any time via{" "}
+        <strong>Settings → Privacy → Clear</strong> or by clearing your
+        browser's site data. Clearing your browser's IndexedDB for this site
+        will permanently delete all history, bookmarks, and settings.
+      </p>
+
+      <h2>2b. Proxy Toggle</h2>
+      <p>
+        Veil includes a <strong>proxy on/off toggle</strong> in the navigation
+        bar. When the proxy is <strong>ON</strong> (green shield), all
+        requests are routed through our server-side proxy — your IP is hidden
+        from target sites. When the proxy is <strong>OFF</strong> (gray
+        shield), pages load directly from the target site — this is faster
+        but your real IP is exposed. The toggle state is saved in IndexedDB
+        and persists across sessions.
+      </p>
 
       <h2>3. Ephemeral Session Data</h2>
       <p>

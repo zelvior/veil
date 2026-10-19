@@ -17,6 +17,7 @@ export function ProxyView({ tab }: Props) {
   const newTab = useProxyStore((s) => s.newTab);
   const updateTab = useProxyStore((s) => s.updateTab);
   const browserProfile = useProxyStore((s) => s.settings.browserProfile);
+  const proxyEnabled = useProxyStore((s) => s.settings.proxyEnabled);
   const findInPageOpen = useProxyStore((s) => s.findInPageOpen);
   const closeFindInPage = useProxyStore((s) => s.closeFindInPage);
   const toggleFindInPage = useProxyStore((s) => s.toggleFindInPage);
@@ -28,8 +29,17 @@ export function ProxyView({ tab }: Props) {
 
   const hasUrl = Boolean(tab.url);
   const zoom = zoomLevels[tab.id] || 1;
+  const blockRedirects = useProxyStore((s) => s.settings.blockRedirects);
+  const blockAds = useProxyStore((s) => s.settings.blockAds);
+  const trafficMask = useProxyStore((s) => s.settings.trafficMask);
+
+  // When proxy is enabled, route through /api/proxy with feature flags.
+  // When disabled, load the URL directly.
   const proxiedSrc = hasUrl
-    ? `/api/proxy?url=${encodeUrl(tab.url)}&ua=${encodeURIComponent(browserProfile)}`
+    ? proxyEnabled
+      ? `/api/proxy?url=${encodeUrl(tab.url)}&ua=${encodeURIComponent(browserProfile)}` +
+        `&br=${blockRedirects ? 1 : 0}&ba=${blockAds ? 1 : 0}&tm=${trafficMask ? 1 : 0}`
+      : tab.url
     : "";
 
   // Timeout fallback so the spinner never gets stuck.

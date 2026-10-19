@@ -9,6 +9,8 @@ import { ProxyView } from "./proxy-view";
 import { Sidebar } from "./sidebar";
 import { CommandPalette } from "./command-palette";
 import { SettingsDialog } from "./settings-dialog";
+import { AppearanceManager } from "./appearance-manager";
+import { useIndexedDBSync, persistHistory, persistSetting } from "@/hooks/use-indexeddb-sync";
 import { hostnameOf } from "@/lib/proxy";
 import { Github, DiscordIcon, YoutubeIcon, LinktreeIcon } from "@/components/icons";
 import Link from "next/link";
@@ -17,10 +19,6 @@ export function BrowserShell() {
   const tabs = useProxyStore((s) => s.tabs);
   const activeId = useProxyStore((s) => s.activeId);
   const settings = useProxyStore((s) => s.settings);
-  const setBookmarks = useProxyStore((s) => s.setBookmarks);
-  const setHistory = useProxyStore((s) => s.setHistory);
-  const setQuickLinks = useProxyStore((s) => s.setQuickLinks);
-  const setSettings = useProxyStore((s) => s.setSettings);
   const newTab = useProxyStore((s) => s.newTab);
   const openPalette = useProxyStore((s) => s.openPalette);
   const closePalette = useProxyStore((s) => s.closePalette);
@@ -36,32 +34,8 @@ export function BrowserShell() {
     }
   }, [activeId, tabs]);
 
-  // load initial data
-  useEffect(() => {
-    (async () => {
-      try {
-        const [bm, hi, ql, st] = await Promise.all([
-          fetch("/api/bookmarks").then((r) => r.json()),
-          fetch("/api/history?limit=200").then((r) => r.json()),
-          fetch("/api/quicklinks").then((r) => r.json()),
-          fetch("/api/settings").then((r) => r.json()),
-        ]);
-        if (bm.items) setBookmarks(bm.items);
-        if (hi.items) setHistory(hi.items);
-        if (ql.items) setQuickLinks(ql.items);
-        if (st.settings) {
-          setSettings({
-            searchEngine: st.settings.searchEngine,
-            showBookmarksBar: st.settings.showBookmarksBar === "true",
-            theme: st.settings.theme,
-            browserProfile: st.settings.browserProfile,
-          });
-        }
-      } catch (e) {
-        // ignore
-      }
-    })();
-  }, [setBookmarks, setHistory, setQuickLinks, setSettings]);
+  // Load all data from IndexedDB (client-side storage — no server needed).
+  useIndexedDBSync();
 
   // apply theme
   useEffect(() => {
@@ -198,23 +172,26 @@ export function BrowserShell() {
   }, [newTab, openPalette, reload, toggleSidebar, goBack, goForward, closePalette]);
 
   // record history when active tab navigates to a real URL
+  // Record history when active tab navigates to a real URL (uses IndexedDB).
   const lastRecorded = useRef<Record<string, string>>({});
   useEffect(() => {
     const tab = tabs.find((t) => t.id === activeId);
     if (!tab || !tab.url || tab.incognito) return;
     if (lastRecorded.current[tab.id] === tab.url) return;
     lastRecorded.current[tab.id] = tab.url;
-    fetch("/api/history", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: tab.url,
-        title: tab.title || hostnameOf(tab.url),
-        favicon: tab.favicon,
-      }),
-    }).then((r) => r.json()).then((data) => {
-      if (data.item) useProxyStore.getState().addHistory(data.item);
-    }).catch(() => {});
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      url: tab.url,
+      title: tab.title || hostnameOf(tab.url),
+      favicon: tab.favicon,
+      visitedAt: new Date().toISOString(),
+    };
+    useProxyStore.getState().addHistory(entry);
+    persistHistory({
+      url: tab.url,
+      title: tab.title || hostnameOf(tab.url),
+      favicon: tab.favicon,
+    });
   }, [activeId, tabs]);
 
   const activeTab = tabs.find((t) => t.id === activeId) || tabs[0];
@@ -233,6 +210,7 @@ export function BrowserShell() {
       <Footer tab={activeTab} />
       <CommandPalette />
       <SettingsDialog />
+      <AppearanceManager />
     </div>
   );
 }

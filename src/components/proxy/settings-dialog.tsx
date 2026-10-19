@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useProxyStore, SEARCH_ENGINES } from "@/store/proxy-store";
+import { useProxyStore, SEARCH_ENGINES, ACCENT_COLORS, type AccentColor } from "@/store/proxy-store";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import { Sun, Moon, Monitor, Shield, Globe, Trash2, Info } from "@/components/ic
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BROWSER_PROFILES } from "@/lib/browser-profiles";
+import { persistSetting, clearHistory as clearHistoryDB } from "@/hooks/use-indexeddb-sync";
 
 export function SettingsDialog() {
   const open = useProxyStore((s) => s.settingsOpen);
@@ -50,20 +51,27 @@ function SettingsBody() {
     const next = { ...local, ...patch };
     setLocal(next);
     setSettings(patch);
-    await fetch("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        searchEngine: next.searchEngine,
-        showBookmarksBar: String(next.showBookmarksBar),
-        theme: next.theme,
-        browserProfile: next.browserProfile,
-      }),
-    });
+    // Persist all changed settings to IndexedDB.
+    const allSettings: Record<string, string> = {
+      searchEngine: next.searchEngine,
+      browserProfile: next.browserProfile,
+      theme: next.theme,
+      showBookmarksBar: String(next.showBookmarksBar),
+      proxyEnabled: String(next.proxyEnabled),
+      accentColor: next.accentColor,
+      density: next.density,
+      fontFamily: next.fontFamily,
+      showStatusBar: String(next.showStatusBar),
+      showFavicons: String(next.showFavicons),
+      homepage: next.homepage,
+    };
+    for (const [key, value] of Object.entries(allSettings)) {
+      persistSetting(key, value);
+    }
   };
 
   const clearHistory = async () => {
-    await fetch("/api/history?all=1", { method: "DELETE" });
+    await clearHistoryDB();
     setHistory([]);
     toast({ title: "All history cleared" });
   };
@@ -89,6 +97,12 @@ function SettingsBody() {
             className="justify-start data-[state=active]:bg-accent"
           >
             General
+          </TabsTrigger>
+          <TabsTrigger
+            value="appearance"
+            className="justify-start data-[state=active]:bg-accent"
+          >
+            Appearance
           </TabsTrigger>
           <TabsTrigger
             value="privacy"
@@ -201,6 +215,116 @@ function SettingsBody() {
                   onCheckedChange={(v) => save({ showBookmarksBar: v })}
                 />
               </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Proxy enabled</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Route requests through the proxy server for privacy. Turn off to load sites directly (no privacy protection).
+                  </p>
+                </div>
+                <Switch
+                  checked={local.proxyEnabled}
+                  onCheckedChange={(v) => save({ proxyEnabled: v })}
+                />
+              </div>
+            </section>
+          </TabsContent>
+
+          {/* ===== APPEARANCE TAB ===== */}
+          <TabsContent value="appearance" className="mt-0 space-y-6">
+            {/* Theme */}
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Theme</h3>
+              <div className="grid grid-cols-3 gap-2">
+                <ThemeCard label="Light" icon={<Sun className="h-4 w-4" />} active={local.theme === "light"} onClick={() => save({ theme: "light" })} />
+                <ThemeCard label="Dark" icon={<Moon className="h-4 w-4" />} active={local.theme === "dark"} onClick={() => save({ theme: "dark" })} />
+                <ThemeCard label="System" icon={<Monitor className="h-4 w-4" />} active={local.theme === "system"} onClick={() => save({ theme: "system" })} />
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* Accent color */}
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Accent color</h3>
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                {(Object.keys(ACCENT_COLORS) as AccentColor[]).map((key) => {
+                  const color = ACCENT_COLORS[key];
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => save({ accentColor: key })}
+                      className={cn(
+                        "flex flex-col items-center gap-1.5 rounded-lg border-2 p-2 transition-all",
+                        local.accentColor === key
+                          ? "border-foreground"
+                          : "border-border hover:border-foreground/30"
+                      )}
+                    >
+                      <div
+                        className="h-6 w-6 rounded-full"
+                        style={{ backgroundColor: color.value }}
+                      />
+                      <span className="text-[10px] font-medium">{color.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* Font family */}
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Font</h3>
+              <Select
+                value={local.fontFamily}
+                onValueChange={(v) => save({ fontFamily: v as typeof local.fontFamily })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="system">System UI</SelectItem>
+                  <SelectItem value="inter">Inter</SelectItem>
+                  <SelectItem value="geistsans">Geist Sans</SelectItem>
+                  <SelectItem value="geistmono">Geist Mono</SelectItem>
+                  <SelectItem value="serif">Serif (Georgia)</SelectItem>
+                </SelectContent>
+              </Select>
+            </section>
+
+            <Separator />
+
+            {/* Density */}
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Density</h3>
+              <div className="grid grid-cols-3 gap-2">
+                <ThemeCard label="Compact" icon={<span className="text-xs">▮</span>} active={local.density === "compact"} onClick={() => save({ density: "compact" })} />
+                <ThemeCard label="Comfortable" icon={<span className="text-sm">▮</span>} active={local.density === "comfortable"} onClick={() => save({ density: "comfortable" })} />
+                <ThemeCard label="Spacious" icon={<span className="text-base">▮</span>} active={local.density === "spacious"} onClick={() => save({ density: "spacious" })} />
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* UI toggles */}
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Interface</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Show status bar</Label>
+                  <p className="text-xs text-muted-foreground">Display hovered link URLs in the footer</p>
+                </div>
+                <Switch checked={local.showStatusBar} onCheckedChange={(v) => save({ showStatusBar: v })} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Show favicons in tabs</Label>
+                  <p className="text-xs text-muted-foreground">Display website icons in the tab bar</p>
+                </div>
+                <Switch checked={local.showFavicons} onCheckedChange={(v) => save({ showFavicons: v })} />
+              </div>
             </section>
           </TabsContent>
 
@@ -216,6 +340,44 @@ function SettingsBody() {
                 the proxy. The destination site never sees your real IP — it
                 sees this server&apos;s IP instead.
               </p>
+            </section>
+
+            {/* Advanced protection toggles */}
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Advanced Protection</h3>
+
+              {/* Redirect blocking */}
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium">Auto-redirect blocking</p>
+                  <p className="text-xs text-muted-foreground">
+                    Block automatic page redirects (meta refresh, location.href, pop-ups). You&apos;ll be asked for permission before any redirect is allowed.
+                  </p>
+                </div>
+                <Switch checked={local.blockRedirects} onCheckedChange={(v) => save({ blockRedirects: v })} />
+              </div>
+
+              {/* Ad blocking */}
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium">Ad &amp; tracker blocking</p>
+                  <p className="text-xs text-muted-foreground">
+                    Block 200+ ad, tracker, analytics, fingerprinting, and crypto-mining domains. Also hides ad elements with cosmetic CSS filters.
+                  </p>
+                </div>
+                <Switch checked={local.blockAds} onCheckedChange={(v) => save({ blockAds: v })} />
+              </div>
+
+              {/* Traffic mask */}
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium">Traffic mask</p>
+                  <p className="text-xs text-muted-foreground">
+                    Randomize request timing, add decoy requests, and shuffle headers to prevent traffic analysis. May slightly slow down page loads.
+                  </p>
+                </div>
+                <Switch checked={local.trafficMask} onCheckedChange={(v) => save({ trafficMask: v })} />
+              </div>
             </section>
 
             <section className="space-y-3">

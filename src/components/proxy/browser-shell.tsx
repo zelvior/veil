@@ -10,7 +10,7 @@ import { Sidebar } from "./sidebar";
 import { CommandPalette } from "./command-palette";
 import { SettingsDialog } from "./settings-dialog";
 import { AppearanceManager } from "./appearance-manager";
-import { useIndexedDBSync, persistHistory, persistSetting } from "@/hooks/use-indexeddb-sync";
+import { useIndexedDBSync, persistHistory, persistSetting, persistBookmark } from "@/hooks/use-indexeddb-sync";
 import { hostnameOf } from "@/lib/proxy";
 import { Github, DiscordIcon, YoutubeIcon, LinktreeIcon } from "@/components/icons";
 import Link from "next/link";
@@ -106,16 +106,17 @@ export function BrowserShell() {
       else if (ctrl && e.key.toLowerCase() === "d") {
         e.preventDefault();
         if (activeTab?.url) {
-          fetch("/api/bookmarks", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              url: activeTab.url,
-              title: activeTab.title || hostnameOf(activeTab.url),
-              favicon: activeTab.favicon,
-            }),
-          }).then(r => r.json()).then(data => {
-            if (data.item) state.addBookmark(data.item);
+          const entry = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            url: activeTab.url,
+            title: activeTab.title || hostnameOf(activeTab.url),
+            favicon: activeTab.favicon,
+          };
+          state.addBookmark(entry);
+          persistBookmark({
+            url: activeTab.url,
+            title: activeTab.title || hostnameOf(activeTab.url),
+            favicon: activeTab.favicon,
           });
         }
       }

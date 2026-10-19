@@ -137,8 +137,11 @@ export function normalizeResponseHeaders(
 
   // Allow our own origin to embed the response and read it.
   out.set("Access-Control-Allow-Origin", "*");
-  // Allow the iframe to run scripts and submit forms.
-  out.delete("x-frame-options");
+  // Explicitly allow framing from any origin (we're a proxy — we NEED to frame).
+  // This overrides any frame-ancestors CSP that might have slipped through.
+  out.set("Content-Security-Policy", "frame-ancestors *; child-src * 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; object-src * 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; script-src * 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; style-src * 'self' 'unsafe-inline' blob: data:; img-src * 'self' 'unsafe-inline' blob: data:; font-src * 'self' 'unsafe-inline' blob: data:; connect-src * 'self' 'unsafe-inline' blob: data:; media-src * 'self' 'unsafe-inline' blob: data:; worker-src * 'self' 'unsafe-inline' blob: data:; frame-src * 'self' 'unsafe-inline' blob: data:;");
+  // Belt-and-suspenders: also set X-Frame-Options to allow framing.
+  out.set("X-Frame-Options", "ALLOWALL");
 
   return out;
 }

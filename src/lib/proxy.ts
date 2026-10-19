@@ -121,34 +121,41 @@ export function rewriteCss(
 ): string {
   if (!css) return css;
 
-  const rewrite = (match: string, quote: string) => {
-    const raw = match.trim();
-    let url = "";
-    if (raw.startsWith("@import")) {
-      url = raw.slice("@import".length).trim();
-    } else {
-      url = raw.slice("url(".length).trim();
-    }
-    if (quote) {
-      url = url.slice(1, -1);
-    } else {
-      url = url.replace(/^["']|["']$/g, "");
-    }
+  /**
+   * Build the proxied URL for a CSS resource.
+   * Returns null if the URL should not be proxied.
+   */
+  const toProxied = (url: string): string | null => {
     url = url.trim();
-    if (!url || !isProxiable(url)) return match;
+    if (!url || !isProxiable(url)) return null;
     const resolved = resolveUrl(url, baseUrl);
-    const proxied = proxiedResourceUrl(resolved, proxyOrigin);
-    if (raw.startsWith("@import")) {
-      return `@import ${quote}${proxied}${quote}`;
-    }
-    return `url(${quote}${proxied}${quote})`;
+    return proxiedResourceUrl(resolved, proxyOrigin);
   };
 
   let out = css;
+
   // url("...") / url('...') / url(...)
-  out = out.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (m, q) => rewrite(m, q || ""));
-  // @import "..." / @import '...' / @import url(...)
-  out = out.replace(/@import\s+(['"])([^'"]+)\1/g, (m, q) => rewrite(m, q));
+  // The regex captures the URL directly (group 2) WITHOUT the closing paren,
+  // so we don't need to re-extract it from the match string.
+  out = out.replace(
+    /url\(\s*(['"]?)([^'")]+)\1\s*\)/g,
+    (fullMatch, quote: string, url: string) => {
+      const proxied = toProxied(url);
+      if (!proxied) return fullMatch;
+      return `url(${quote}${proxied}${quote})`;
+    }
+  );
+
+  // @import "..." / @import '...'
+  out = out.replace(
+    /@import\s+(['"])([^'"]+)\1/g,
+    (fullMatch, quote: string, url: string) => {
+      const proxied = toProxied(url);
+      if (!proxied) return fullMatch;
+      return `@import ${quote}${proxied}${quote}`;
+    }
+  );
+
   return out;
 }
 

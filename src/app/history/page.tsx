@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
 import { useProxyStore } from "@/store/proxy-store";
 import { faviconFor, hostnameOf } from "@/lib/proxy";
 import { LegalLayout } from "@/components/legal/legal-layout";
-import { Search, Trash2, Clock, ArrowLeft, ExternalLink, X } from "lucide-react";
+import { historyDB } from "@/lib/indexeddb";
+import { Search, Trash2, Clock, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -16,14 +16,19 @@ export default function HistoryPage() {
   const { toast } = useToast();
   const [query, setQuery] = useState("");
 
-  // Load fresh history from the API.
+  // Load fresh history from IndexedDB.
   useEffect(() => {
-    fetch("/api/history?limit=1000")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.items) setHistory(data.items);
-      })
-      .catch(() => {});
+    historyDB.getAll(1000).then((items) => {
+      setHistory(
+        items.map((h) => ({
+          id: h.id,
+          url: h.url,
+          title: h.title,
+          favicon: h.favicon,
+          visitedAt: new Date(h.visitedAt).toISOString(),
+        }))
+      );
+    }).catch(() => {});
   }, [setHistory]);
 
   const filtered = useMemo(() => {
@@ -39,12 +44,12 @@ export default function HistoryPage() {
   const grouped = useMemo(() => groupByDay(filtered), [filtered]);
 
   const deleteItem = async (id: string) => {
-    await fetch(`/api/history?id=${id}`, { method: "DELETE" });
+    await historyDB.delete(id);
     setHistory(history.filter((h) => h.id !== id));
   };
 
   const clearAll = async () => {
-    await fetch("/api/history?all=1", { method: "DELETE" });
+    await historyDB.clearAll();
     setHistory([]);
     toast({ title: "All history cleared" });
   };
@@ -52,7 +57,6 @@ export default function HistoryPage() {
   return (
     <LegalLayout title="Browsing History" lastUpdated="Live">
       <div className="not-prose space-y-4">
-        {/* Search bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -71,7 +75,6 @@ export default function HistoryPage() {
           )}
         </div>
 
-        {/* Actions */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {filtered.length} {filtered.length === 1 ? "entry" : "entries"}
@@ -84,7 +87,6 @@ export default function HistoryPage() {
           )}
         </div>
 
-        {/* History list grouped by day */}
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Clock className="h-12 w-12 text-muted-foreground/30 mb-4" />
@@ -92,9 +94,7 @@ export default function HistoryPage() {
               {query ? "No matching entries" : "No browsing history yet"}
             </p>
             <p className="text-xs text-muted-foreground/70 mt-1">
-              {query
-                ? "Try a different search term"
-                : "Pages you visit will appear here"}
+              {query ? "Try a different search term" : "Pages you visit will appear here"}
             </p>
           </div>
         ) : (
@@ -114,23 +114,14 @@ export default function HistoryPage() {
                         src={h.favicon || faviconFor(h.url)}
                         alt=""
                         className="h-4 w-4 rounded-sm flex-shrink-0"
-                        onError={(e) =>
-                          ((e.target as HTMLImageElement).style.visibility = "hidden")
-                        }
+                        onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")}
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">
-                          {h.title || hostnameOf(h.url)}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {hostnameOf(h.url)}
-                        </p>
+                        <p className="text-sm font-medium truncate">{h.title || hostnameOf(h.url)}</p>
+                        <p className="text-xs text-muted-foreground truncate">{hostnameOf(h.url)}</p>
                       </div>
                       <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
-                        {new Date(h.visitedAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {new Date(h.visitedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
                       <button
                         onClick={() => deleteItem(h.id)}
@@ -151,27 +142,19 @@ export default function HistoryPage() {
   );
 }
 
-function groupByDay(
-  items: { id: string; visitedAt: string; url: string; title: string; favicon: string | null }[]
-) {
+function groupByDay(items: { id: string; visitedAt: string; url: string; title: string; favicon: string | null }[]) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const yesterday = today - 86400000;
   const weekAgo = today - 7 * 86400000;
-
   const buckets: Record<string, typeof items> = {};
   for (const it of items) {
     const t = new Date(it.visitedAt).getTime();
     let label: string;
     if (t >= today) label = "Today";
     else if (t >= yesterday) label = "Yesterday";
-    else if (t >= weekAgo)
-      label = new Date(it.visitedAt).toLocaleDateString([], { weekday: "long" });
-    else
-      label = new Date(it.visitedAt).toLocaleDateString([], {
-        month: "short",
-        day: "numeric",
-      });
+    else if (t >= weekAgo) label = new Date(it.visitedAt).toLocaleDateString([], { weekday: "long" });
+    else label = new Date(it.visitedAt).toLocaleDateString([], { month: "short", day: "numeric" });
     if (!buckets[label]) buckets[label] = [];
     buckets[label].push(it);
   }

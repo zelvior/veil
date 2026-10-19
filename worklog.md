@@ -733,3 +733,40 @@ Stage Summary:
 - Settings persist in IndexedDB
 - Agent Browser verified: example.com loads with redirect interceptor + cosmetic filters injected, settings show all 3 toggles
 - `bun run lint` passes clean; `bun run build` passes — 20 routes compiled
+
+---
+Task ID: 17
+Agent: main (Z.ai Code)
+Task: Fix all remaining mocked/broken features — migrate all client components from server API calls to IndexedDB.
+
+Work Log:
+- **Found 7 places** still using server API calls (`fetch("/api/...")`) instead of IndexedDB:
+  1. `browser-shell.tsx` — Ctrl+D bookmark shortcut used `fetch("/api/bookmarks", {POST})` → replaced with `persistBookmark()`
+  2. `bookmarks-bar.tsx` — Delete bookmark used `fetch("/api/bookmarks?id=...", {DELETE})` → replaced with `deleteBookmark()`
+  3. `sidebar.tsx` — Clear all history used `fetch("/api/history?all=1", {DELETE})` → replaced with `clearHistoryDB()`
+  4. `sidebar.tsx` — Delete history item used `fetch("/api/history?id=...", {DELETE})` → replaced with `deleteHistory()`
+  5. `sidebar.tsx` — Delete bookmark used `fetch("/api/bookmarks?id=...", {DELETE})` → replaced with `deleteBookmark()`
+  6. `new-tab-page.tsx` — Delete quick link used `fetch("/api/quicklinks?id=...", {DELETE})` → replaced with `deleteQuickLink()`
+  7. `new-tab-page.tsx` — Add quick link used `fetch("/api/quicklinks", {POST})` → replaced with `persistQuickLink()`
+- **Also fixed history/bookmarks manager pages** (`/history` and `/bookmarks`):
+  - Both were loading data from server APIs → now use `historyDB.getAll()` and `bookmarksDB.getAll()` directly
+  - Both were deleting via server APIs → now use `historyDB.delete()`, `bookmarksDB.delete()`, `historyDB.clearAll()`
+  - Bookmarks edit (delete + re-add) → now uses `bookmarksDB.delete()` + `bookmarksDB.add()`
+- Verified **zero** remaining `fetch("/api/...")` calls in client components (grep confirms 0 matches)
+
+Stage Summary:
+- ALL features now use real IndexedDB storage — no mocks, no server fallbacks
+- Verified end-to-end with Agent Browser:
+  1. ✅ Proxy fetches real pages (HN loaded with real stories/points)
+  2. ✅ IndexedDB persists data across reloads (1 bookmark + 2 history entries survived)
+  3. ✅ Settings save/load from IndexedDB (accentColor=violet persisted)
+  4. ✅ Ctrl+D bookmark actually saves to IndexedDB (BM_COUNT:1)
+  5. ✅ History records to IndexedDB (HIST_COUNT:2)
+  6. ✅ Find in page highlights real matches (30/30 on HN)
+  7. ✅ Zoom actually changes iframe zoom (controls appear)
+  8. ✅ Proxy toggle switches between "Proxy" and "Direct"
+  9. ✅ Appearance customization changes CSS variables (--accent=#8b5cf6)
+  10. ✅ Zero console messages, zero errors
+  11. ✅ Accent color persists after reload (#8b5cf6 loaded from IndexedDB)
+  12. ✅ Bookmark persists after reload (shows in bookmarks bar)
+- `bun run lint` passes clean; `bun run build` passes — 20 routes compiled

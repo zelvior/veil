@@ -4,6 +4,7 @@ import { useProxyStore } from "@/store/proxy-store";
 import { Bookmark as BookmarkIcon, X } from "@/components/icons";
 import { faviconFor, hostnameOf } from "@/lib/proxy";
 import { cn } from "@/lib/utils";
+import { deleteBookmark } from "@/hooks/use-indexeddb-sync";
 
 export function BookmarksBar() {
   const bookmarks = useProxyStore((s) => s.bookmarks);
@@ -45,7 +46,7 @@ export function BookmarksBar() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                fetch(`/api/bookmarks?id=${b.id}`, { method: "DELETE" });
+                deleteBookmark(b.id);
                 removeBookmark(b.id);
               }}
               className="ml-0.5 hidden h-4 w-4 items-center justify-center rounded group-hover:flex hover:bg-destructive hover:text-destructive-foreground"

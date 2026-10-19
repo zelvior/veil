@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useProxyStore } from "@/store/proxy-store";
+import { persistQuickLink, deleteQuickLink } from "@/hooks/use-indexeddb-sync";
 import {
   Plus,
   X,
@@ -233,9 +234,7 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
                 onDelete={
                   quickLinks.length
                     ? () => {
-                        fetch(`/api/quicklinks?id=${link.id}`, {
-                          method: "DELETE",
-                        });
+                        deleteQuickLink(link.id);
                         removeQuickLink(link.id);
                       }
                     : undefined
@@ -344,13 +343,20 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
             <Button
               onClick={async () => {
                 if (!newUrl || !newTitle) return;
-                const res = await fetch("/api/quicklinks", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ url: newUrl, title: newTitle }),
+                const entry = {
+                  id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                  url: newUrl,
+                  title: newTitle,
+                  icon: null,
+                  color: null,
+                };
+                addQuickLink(entry);
+                await persistQuickLink({
+                  url: newUrl,
+                  title: newTitle,
+                  icon: null,
+                  color: null,
                 });
-                const data = await res.json();
-                if (data.item) addQuickLink(data.item);
                 setNewUrl("");
                 setNewTitle("");
                 setAddOpen(false);

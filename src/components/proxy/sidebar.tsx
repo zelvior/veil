@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useProxyStore } from "@/store/proxy-store";
 import { faviconFor, hostnameOf } from "@/lib/proxy";
+import { deleteBookmark, deleteHistory, clearHistory as clearHistoryDB } from "@/hooks/use-indexeddb-sync";
 import {
   X,
   History as HistoryIcon,
@@ -47,7 +48,7 @@ export function Sidebar() {
   const grouped = groupByDay(filteredHistory);
 
   const clearAllHistory = async () => {
-    await fetch("/api/history?all=1", { method: "DELETE" });
+    await clearHistoryDB();
     setHistory([]);
     toast({ title: "History cleared" });
   };
@@ -111,7 +112,7 @@ export function Sidebar() {
                     item={h}
                     onOpen={() => tab && navigate(tab.id, h.url)}
                     onDelete={async () => {
-                      await fetch(`/api/history?id=${h.id}`, { method: "DELETE" });
+                      await deleteHistory(h.id);
                       setHistory(history.filter((x) => x.id !== h.id));
                     }}
                   />
@@ -139,7 +140,7 @@ export function Sidebar() {
                 item={{ ...b, visitedAt: new Date().toISOString() }}
                 onOpen={() => tab && navigate(tab.id, b.url)}
                 onDelete={async () => {
-                  await fetch(`/api/bookmarks?id=${b.id}`, { method: "DELETE" });
+                  await deleteBookmark(b.id);
                   removeBookmark(b.id);
                 }}
               />

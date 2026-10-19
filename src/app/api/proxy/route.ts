@@ -126,7 +126,11 @@ h1{font-size:20px;margin:0 0 12px;color:#111}
 </div></body></html>`;
   return new NextResponse(html, {
     status,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": "frame-ancestors *",
+      "X-Frame-Options": "ALLOWALL",
+    },
   });
 }
 
@@ -362,15 +366,30 @@ export async function GET(req: NextRequest) {
     return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 
-  // --- Non-2xx: styled error pages for documents, pass-through for resources ---
-  if (upstream.status >= 400 && isDocument) {
-    const res = errorPage(
-      finalTarget,
-      `The destination server returned HTTP ${upstream.status}.`,
-      upstream.status,
-      proxyOrigin,
-      profileId
-    );
+  // --- Non-2xx: styled error pages for documents, empty response for resources ---
+  if (upstream.status >= 400) {
+    if (isDocument) {
+      const res = errorPage(
+        finalTarget,
+        `The destination server returned HTTP ${upstream.status}.`,
+        upstream.status,
+        proxyOrigin,
+        profileId
+      );
+      return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
+    }
+    // For non-document resources (fonts, images, etc.) that return errors,
+    // return an empty response with the correct status code instead of the
+    // upstream's HTML error page. This prevents "Failed to decode font" and
+    // "OTS parsing error" console errors when a font/image 404s.
+    const emptyHeaders = new Headers();
+    emptyHeaders.set("Access-Control-Allow-Origin", "*");
+    emptyHeaders.set("Content-Type", "application/octet-stream");
+    emptyHeaders.set("Content-Length", "0");
+    const res = new NextResponse(null, {
+      status: upstream.status,
+      headers: emptyHeaders,
+    });
     return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
 

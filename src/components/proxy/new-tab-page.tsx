@@ -313,7 +313,7 @@ export function NewTabPageContent({ tab }: { tab: Tab }) {
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Add Quick Link</DialogTitle>
           </DialogHeader>

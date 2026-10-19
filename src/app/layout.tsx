@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,10 +35,9 @@ export const metadata: Metadata = {
     "privacy",
     "Next.js proxy",
     "CroxProxy alternative",
+    "PWA",
   ],
-  authors: [
-    { name: "Zelvior", url: "https://linktr.ee/zelvior" },
-  ],
+  authors: [{ name: "Zelvior", url: "https://linktr.ee/zelvior" }],
   creator: "Zelvior",
   publisher: "Zelvior Labs",
   category: "technology",
@@ -45,12 +45,13 @@ export const metadata: Metadata = {
     icon: [
       { url: "/favicon.png", type: "image/png" },
       { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
     ],
     shortcut: "/favicon.png",
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
+  manifest: "/manifest.json",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -76,18 +77,31 @@ export const metadata: Metadata = {
     creator: "@zelviorhere",
     images: ["/logo.png"],
   },
-  robots: {
-    index: true,
-    follow: true,
+  robots: { index: true, follow: true },
+  appleWebApp: {
+    capable: true,
+    title: "Veil",
+    statusBarStyle: "black-translucent",
   },
-  manifest: undefined,
+  formatDetection: {
+    telephone: false,
+    email: false,
+    address: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#10b981",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -95,6 +109,7 @@ export default function RootLayout({
       >
         {children}
         <Toaster />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

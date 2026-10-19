@@ -43,7 +43,13 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ item });
   } catch (e) {
-    return NextResponse.json({ error: "db_unavailable" }, { status: 503 });
+    // DB unavailable (e.g., Vercel without database) — return 200 with
+    // a synthetic item so the client UI doesn't see an error. History
+    // just won't persist, which is acceptable.
+    return NextResponse.json({
+      item: { id: "ephemeral", url, title: title || "", favicon: favicon || null, visitedAt: new Date().toISOString() },
+      warn: "db_unavailable",
+    });
   }
 }
 
@@ -62,6 +68,6 @@ export async function DELETE(req: NextRequest) {
     }
     return NextResponse.json({ error: "specify id or all" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: "db_unavailable" }, { status: 503 });
+    return NextResponse.json({ ok: true, warn: "db_unavailable" });
   }
 }

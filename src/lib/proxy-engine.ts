@@ -620,31 +620,71 @@ if (window.SharedWorker) {
 /* ---- 5d. WebRTC IP Leak Prevention ----
  * RTCPeerConnection can leak the user's real local and public IP addresses
  * via ICE candidate gathering, even through a proxy. We neutralize it by
- * throwing on construction, which causes sites that check for WebRTC support
- * to fall back to non-WebRTC communication. This is the standard approach
- * used by privacy-focused browsers (Tor Browser, Brave, etc.).
+ * returning a NO-OP STUB instead of throwing — throwing crashes complex
+ * SPAs like YouTube that expect RTCPeerConnection to be constructable.
  *
- * We also set navigator.connection to undefined to prevent network
- * information leaks.
+ * The stub implements the standard RTCPeerConnection interface with
+ * no-op methods and empty event targets, so site code that does
+ * new RTCPeerConnection() won't crash, but no real connection is
+ * ever made (so no IP leak).
  */
-if (window.RTCPeerConnection) {
-  window.RTCPeerConnection = function(){
-    throw new TypeError('RTCPeerConnection is disabled by the proxy for privacy (IP leak prevention).');
+function NoOpRTCPeerConnection(){
+  // Return an object with the expected RTCPeerConnection interface.
+  var noop = function(){};
+  var emptyEmitter = { addEventListener: noop, removeEventListener: noop, dispatchEvent: function(){return false;} };
+  return {
+    createOffer: function(){ return Promise.reject(new Error('WebRTC disabled')); },
+    createAnswer: function(){ return Promise.reject(new Error('WebRTC disabled')); },
+    setLocalDescription: function(){ return Promise.resolve(); },
+    setRemoteDescription: function(){ return Promise.resolve(); },
+    addIceCandidate: function(){ return Promise.resolve(); },
+    close: noop,
+    getStats: function(){ return Promise.resolve(new Map()); },
+    getSenders: function(){ return []; },
+    getReceivers: function(){ return []; },
+    getTransceivers: function(){ return []; },
+    addTrack: function(){ return {}; },
+    removeTrack: noop,
+    addTransceiver: function(){ return {}; },
+    createDataChannel: function(){ return emptyEmitter; },
+    getConfiguration: function(){ return {}; },
+    setConfiguration: noop,
+    restartIce: noop,
+    // Event targets
+    onicecandidate: null,
+    onicegatheringstatechange: null,
+    oniceconnectionstatechange: null,
+    onconnectionstatechange: null,
+    ontrack: null,
+    ondatachannel: null,
+    onnegotiationneeded: null,
+    onsignalingstatechange: null,
+    addEventListener: noop,
+    removeEventListener: noop,
+    dispatchEvent: function(){ return false; },
+    // State
+    localDescription: null,
+    remoteDescription: null,
+    signalingState: 'closed',
+    iceConnectionState: 'closed',
+    connectionState: 'closed',
+    iceGatheringState: 'complete',
+    currentLocalDescription: null,
+    currentRemoteDescription: null,
+    pendingLocalDescription: null,
+    pendingRemoteDescription: null,
   };
-  window.webkitRTCPeerConnection = window.RTCPeerConnection;
+}
+// Preserve static properties that sites may check.
+if (window.RTCPeerConnection) {
+  NoOpRTCPeerConnection.generateCertificate = function(){ return Promise.reject(new Error('WebRTC disabled')); };
+  window.RTCPeerConnection = NoOpRTCPeerConnection;
+}
+if (window.webkitRTCPeerConnection) {
+  window.webkitRTCPeerConnection = NoOpRTCPeerConnection;
 }
 if (window.mozRTCPeerConnection) {
-  window.mozRTCPeerConnection = window.RTCPeerConnection;
-}
-// Block createObjectURL for media streams (used by some older WebRTC code).
-if (URL.createObjectURL) {
-  var origCreateObjectURL = URL.createObjectURL;
-  URL.createObjectURL = function(obj){
-    if (obj && typeof obj === 'object' && obj.constructor && /MediaStream/i.test(obj.constructor.name)) {
-      return null; // Block media stream object URLs
-    }
-    return origCreateObjectURL.apply(this, arguments);
-  };
+  window.mozRTCPeerConnection = NoOpRTCPeerConnection;
 }
 
 /* ---- 5e. Override HTMLFormElement.prototype.submit ----

@@ -32,7 +32,7 @@ export function SettingsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && close()}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden" aria-describedby={undefined}>
         {open ? <SettingsBody /> : null}
       </DialogContent>
     </Dialog>

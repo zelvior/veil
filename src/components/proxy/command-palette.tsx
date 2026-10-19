@@ -17,7 +17,7 @@ export function CommandPalette() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && close()}>
-      <DialogContent className="p-0 gap-0 max-w-xl overflow-hidden rounded-2xl" showCloseButton={false}>
+      <DialogContent className="p-0 gap-0 max-w-xl overflow-hidden rounded-2xl" showCloseButton={false} aria-describedby={undefined}>
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         {open ? <PaletteBody onDone={close} /> : null}
       </DialogContent>

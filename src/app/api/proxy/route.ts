@@ -25,6 +25,13 @@ import {
   getSessionCookieName,
   type Session,
 } from "@/lib/session-store";
+import {
+  shouldCache,
+  getCached,
+  setCached,
+  buildCacheKey,
+  type CacheEntry,
+} from "@/lib/proxy-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -261,6 +268,23 @@ export async function GET(req: NextRequest) {
   const cookieHeader = sessionCookieHeaderFor(session, finalTarget);
   const rangeHeader = req.headers.get("range");
 
+  // --- Cache check: for non-document, non-Range requests, check the LRU cache ---
+  // This avoids re-fetching + re-rewriting CSS/JS/images on every page load.
+  const cacheKey = buildCacheKey(finalTarget, profileId);
+  if (!isDocument && !rangeHeader) {
+    const cached = getCached(cacheKey);
+    if (cached) {
+      // Cache hit — return the cached response immediately.
+      const headers = new Headers(cached.headers);
+      headers.set("X-Cache", "HIT");
+      const res = new NextResponse(cached.body, {
+        status: cached.status,
+        headers,
+      });
+      return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
+    }
+  }
+
   const upstreamHeaders = buildSecureUpstreamHeaders(
     finalTarget,
     profileId,
@@ -363,6 +387,17 @@ export async function GET(req: NextRequest) {
       });
       headers.set("Content-Type", "text/css; charset=utf-8");
       headers.set("X-Proxied-Url", finalUrl);
+      headers.set("Cache-Control", "public, max-age=300");
+      headers.set("X-Cache", "MISS");
+      // Store in server-side cache for 5 minutes
+      if (shouldCache(contentType, upstream.status)) {
+        const bodyBuf = Buffer.from(rewritten, "utf-8");
+        setCached(cacheKey, {
+          body: bodyBuf,
+          status: 200,
+          headers: Array.from(headers.entries()),
+        });
+      }
       const res = new NextResponse(rewritten, { status: 200, headers });
       return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
     }
@@ -375,6 +410,16 @@ export async function GET(req: NextRequest) {
     });
     headers.set("Content-Type", "application/javascript; charset=utf-8");
     headers.set("X-Proxied-Url", finalUrl);
+    headers.set("Cache-Control", "public, max-age=300");
+    headers.set("X-Cache", "MISS");
+    if (shouldCache(contentType, upstream.status)) {
+      const bodyBuf = Buffer.from(rewritten, "utf-8");
+      setCached(cacheKey, {
+        body: bodyBuf,
+        status: 200,
+        headers: Array.from(headers.entries()),
+      });
+    }
     const res = new NextResponse(rewritten, { status: 200, headers });
     return setSessionCookieIfNeeded(res, session, isHttps, incomingCookie);
   }
@@ -393,6 +438,11 @@ export async function GET(req: NextRequest) {
     keepRangeHeaders: true,
   });
   streamHeaders.set("X-Proxied-Url", finalUrl);
+  // Browser cache for static assets (images, fonts, media) — 10 minutes
+  if (!rangeHeader && shouldCache(contentType, upstream.status)) {
+    streamHeaders.set("Cache-Control", "public, max-age=600");
+  }
+  streamHeaders.set("X-Cache", "MISS");
 
   if (!streamHeaders.has("Accept-Ranges")) {
     streamHeaders.set("Accept-Ranges", "bytes");
@@ -448,12 +498,19 @@ export async function POST(req: NextRequest) {
     req.headers.get("content-type") || "application/x-www-form-urlencoded";
   const bodyBuf = Buffer.from(await req.arrayBuffer());
 
+  // Detect if this POST is a form navigation (document) or an XHR/fetch
+  // API call (resource). The browser's Sec-Fetch-Mode header tells us:
+  //   "navigate" → form submission → use document headers
+  //   "cors"/"same-origin"/"no-cors" → XHR/fetch → use resource headers
+  const incomingFetchMode = req.headers.get("sec-fetch-mode") || "";
+  const isDocumentPost = incomingFetchMode === "navigate";
+
   const cookieHeader = sessionCookieHeaderFor(session, targetUrl);
   const upstreamHeaders = buildSecureUpstreamHeaders(
     targetUrl,
     profileId,
     cookieHeader,
-    { isDocument: true, referer: targetUrl }
+    { isDocument: isDocumentPost, referer: targetUrl }
   );
   upstreamHeaders["Content-Type"] = contentType;
 

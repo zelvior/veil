@@ -532,3 +532,68 @@ Stage Summary:
 - Verified: manifest.json served (200, application/json), sw.js served (200), all icons served, PWA meta tags in HTML head (theme-color, manifest link, apple-mobile-web-app-title, icons)
 - Agent Browser verified: HN loads with cache, second page navigation uses cached CSS/JS
 - `bun run lint` passes clean; `bun run build` passes — all 18 routes compiled
+
+---
+Task ID: 13
+Agent: main (Z.ai Code)
+Task: Make Veil a real browser — add find-in-page, zoom, status bar, tab context menu, history/bookmarks managers, and comprehensive keyboard shortcuts.
+
+Work Log:
+- **Find in Page (Ctrl+F)**: Created `find-in-page.tsx` — overlay bar at top-right of proxy view.
+  - Injects a search script into the iframe that walks text nodes, highlights matches with yellow/orange spans, and scrolls to current match.
+  - Shows match count (e.g., "1/1"), next/prev navigation (Enter/Shift+Enter), Esc to close.
+  - Uses same-origin iframe access (our proxy serves the iframe) to directly manipulate the DOM.
+- **Zoom (Ctrl+/-/0)**: Per-tab zoom with persistence in the Zustand store.
+  - Zoom controls (bottom-left) with percentage indicator, only visible when zoomed.
+  - Zoom indicator in the footer status bar.
+  - CSS `zoom` property injected into the iframe document.
+  - Range: 25% to 500%.
+- **Status bar**: Footer shows hovered link URLs (like Chrome's bottom-left status).
+  - Added `mouseover`/`mouseout` listeners in the interceptor that postMessage the hovered link URL to the parent.
+  - Parent displays it in the footer with a → prefix and emerald color.
+  - Clears on mouseout.
+- **Tab context menu**: Right-click on any tab shows a context menu.
+  - Reload tab, Duplicate tab, Close tab, Close other tabs, Close tabs to the right, Close tabs to the left.
+  - Uses shadcn/ui ContextMenu component.
+- **Full History manager page** at `/history`:
+  - Card-based layout with search box, live count, "Clear all" button.
+  - Entries grouped by day (Today, Yesterday, weekday name, date).
+  - Per-entry delete with hover X button, favicon, title, URL, timestamp.
+  - Reuses the LegalLayout for consistent navigation.
+- **Full Bookmarks manager page** at `/bookmarks`:
+  - Grid layout with search box, live count.
+  - Per-bookmark edit (title + URL) and delete with hover buttons.
+  - Edit dialog with save/cancel.
+  - Reuses the LegalLayout.
+- **Navigation menu updates**: Added "History manager" and "Bookmarks manager" menu items that open the full pages in new tabs.
+- **Comprehensive keyboard shortcuts** (updated browser-shell.tsx):
+  - Ctrl+T — new tab
+  - Ctrl+Shift+T — new incognito tab
+  - Ctrl+K — command palette
+  - Ctrl+R — reload
+  - Ctrl+B — bookmarks sidebar
+  - Ctrl+H — history sidebar
+  - **Ctrl+F — find in page** (NEW)
+  - **Ctrl+L — focus address bar** (NEW)
+  - **Ctrl+D — bookmark current page** (NEW)
+  - **Ctrl+= / Ctrl+- — zoom in/out** (NEW)
+  - **Ctrl+0 — reset zoom** (NEW)
+  - **Ctrl+Tab — next tab** (NEW)
+  - **Ctrl+W — close tab** (NEW)
+  - Alt+Left/Right — back/forward
+  - **F11 — toggle fullscreen** (NEW)
+  - Esc — close any open overlay (palette, find, sidebar)
+
+Stage Summary:
+- Veil is now a real browser with 10+ new features:
+  1. ✅ Find in Page (Ctrl+F) — verified: "1/1" match on example.com
+  2. ✅ Zoom (Ctrl+/-/0) — verified: 120% with zoom controls visible
+  3. ✅ Status bar — shows hovered link URLs in footer
+  4. ✅ Tab context menu — right-click for close/duplicate/close others/close right/left
+  5. ✅ History manager page (/history) — 38 entries grouped by day with search
+  6. ✅ Bookmarks manager page (/bookmarks) — grid with search, edit, delete
+  7. ✅ Comprehensive keyboard shortcuts (Ctrl+F, Ctrl+L, Ctrl+D, Ctrl+/-/0, Ctrl+Tab, Ctrl+W, F11)
+  8. ✅ Nav menu links to history/bookmarks managers
+- `bun run lint` passes clean
+- `bun run build` passes — 20 routes compiled (was 18, +/history +/bookmarks)
+- Agent Browser verified: Find in Page works (1/1), zoom works (120%), history page shows 38 entries, bookmarks page shows entries

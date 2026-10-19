@@ -232,10 +232,16 @@ export function NavigationBar() {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => toggleSidebar("history")}>
-            History
+            History sidebar
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => toggleSidebar("bookmarks")}>
-            Bookmarks
+            Bookmarks sidebar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => window.open("/history", "_blank")}>
+            History manager
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => window.open("/bookmarks", "_blank")}>
+            Bookmarks manager
           </DropdownMenuItem>
           <DropdownMenuItem onClick={openSettings}>Settings</DropdownMenuItem>
           <DropdownMenuSeparator />

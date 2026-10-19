@@ -91,6 +91,11 @@ interface ProxyState {
   sidebarPanel: SidebarPanel;
   paletteOpen: boolean;
   settingsOpen: boolean;
+  findInPageOpen: boolean;
+  /** Current zoom level per tab (1 = 100%, 1.25 = 125%). */
+  zoomLevels: Record<string, number>;
+  /** Hovered link URL for status bar display. */
+  hoveredUrl: string | null;
   bookmarks: Bookmark[];
   history: HistoryItem[];
   quickLinks: QuickLink[];
@@ -122,6 +127,14 @@ interface ProxyState {
   closePalette: () => void;
   openSettings: () => void;
   closeSettings: () => void;
+  toggleFindInPage: () => void;
+  closeFindInPage: () => void;
+  setZoom: (tabId: string, zoom: number) => void;
+  zoomIn: (tabId: string) => void;
+  zoomOut: (tabId: string) => void;
+  zoomReset: (tabId: string) => void;
+  getZoom: (tabId: string) => number;
+  setHoveredUrl: (url: string | null) => void;
 
   // data
   setBookmarks: (b: Bookmark[]) => void;
@@ -143,6 +156,9 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
   sidebarPanel: null,
   paletteOpen: false,
   settingsOpen: false,
+  findInPageOpen: false,
+  zoomLevels: {},
+  hoveredUrl: null,
   bookmarks: [],
   history: [],
   quickLinks: [],
@@ -362,6 +378,33 @@ export const useProxyStore = create<ProxyState>((set, get) => ({
   closePalette: () => set({ paletteOpen: false }),
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
+  toggleFindInPage: () => set((s) => ({ findInPageOpen: !s.findInPageOpen })),
+  closeFindInPage: () => set({ findInPageOpen: false }),
+
+  setZoom: (tabId, zoom) =>
+    set((s) => ({
+      zoomLevels: { ...s.zoomLevels, [tabId]: Math.max(0.25, Math.min(5, zoom)) },
+    })),
+  zoomIn: (tabId) =>
+    set((s) => {
+      const current = s.zoomLevels[tabId] || 1;
+      const next = Math.min(5, current + 0.1);
+      return { zoomLevels: { ...s.zoomLevels, [tabId]: next } };
+    }),
+  zoomOut: (tabId) =>
+    set((s) => {
+      const current = s.zoomLevels[tabId] || 1;
+      const next = Math.max(0.25, current - 0.1);
+      return { zoomLevels: { ...s.zoomLevels, [tabId]: next } };
+    }),
+  zoomReset: (tabId) =>
+    set((s) => {
+      const { [tabId]: _, ...rest } = s.zoomLevels;
+      return { zoomLevels: rest };
+    }),
+  getZoom: (tabId) => get().zoomLevels[tabId] || 1,
+
+  setHoveredUrl: (url) => set({ hoveredUrl: url }),
 
   setBookmarks: (b) => set({ bookmarks: b }),
   setHistory: (h) => set({ history: h }),

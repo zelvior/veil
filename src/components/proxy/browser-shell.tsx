@@ -83,32 +83,114 @@ export function BrowserShell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey;
-      if (ctrl && e.key.toLowerCase() === "t") {
+      const state = useProxyStore.getState();
+      const activeTab = state.tabs.find((x) => x.id === state.activeId);
+
+      // Ctrl+T — new tab
+      if (ctrl && e.key.toLowerCase() === "t" && !e.shiftKey) {
         e.preventDefault();
         newTab();
-      } else if (ctrl && e.key.toLowerCase() === "k") {
+      }
+      // Ctrl+Shift+T — new incognito tab
+      else if (ctrl && e.shiftKey && e.key.toLowerCase() === "T") {
+        e.preventDefault();
+        newTab(undefined, true);
+      }
+      // Ctrl+K — command palette
+      else if (ctrl && e.key.toLowerCase() === "k") {
         e.preventDefault();
         openPalette();
-      } else if (ctrl && e.key.toLowerCase() === "r") {
+      }
+      // Ctrl+R — reload
+      else if (ctrl && e.key.toLowerCase() === "r") {
         e.preventDefault();
-        const t = useProxyStore.getState().tabs.find((x) => x.id === useProxyStore.getState().activeId);
-        if (t?.url) reload(t.id);
-      } else if (ctrl && e.key.toLowerCase() === "b") {
+        if (activeTab?.url) reload(activeTab.id);
+      }
+      // Ctrl+B — bookmarks sidebar
+      else if (ctrl && e.key.toLowerCase() === "b") {
         e.preventDefault();
         toggleSidebar("bookmarks");
-      } else if (ctrl && e.key.toLowerCase() === "h") {
+      }
+      // Ctrl+H — history sidebar
+      else if (ctrl && e.key.toLowerCase() === "h") {
         e.preventDefault();
         toggleSidebar("history");
-      } else if (e.altKey && e.key === "ArrowLeft") {
+      }
+      // Ctrl+F — find in page
+      else if (ctrl && e.key.toLowerCase() === "f") {
         e.preventDefault();
-        const t = useProxyStore.getState().tabs.find((x) => x.id === useProxyStore.getState().activeId);
-        if (t) goBack(t.id);
-      } else if (e.altKey && e.key === "ArrowRight") {
+        state.toggleFindInPage();
+      }
+      // Ctrl+L — focus address bar
+      else if (ctrl && e.key.toLowerCase() === "l") {
         e.preventDefault();
-        const t = useProxyStore.getState().tabs.find((x) => x.id === useProxyStore.getState().activeId);
-        if (t) goForward(t.id);
-      } else if (e.key === "Escape" && useProxyStore.getState().paletteOpen) {
-        closePalette();
+        const input = document.querySelector('input[placeholder*="Search the web"]') as HTMLInputElement;
+        input?.focus();
+        input?.select();
+      }
+      // Ctrl+D — bookmark current page
+      else if (ctrl && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        if (activeTab?.url) {
+          fetch("/api/bookmarks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: activeTab.url,
+              title: activeTab.title || hostnameOf(activeTab.url),
+              favicon: activeTab.favicon,
+            }),
+          }).then(r => r.json()).then(data => {
+            if (data.item) state.addBookmark(data.item);
+          });
+        }
+      }
+      // Ctrl+= (zoom in) / Ctrl+- (zoom out) / Ctrl+0 (reset)
+      else if (ctrl && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        if (activeTab) state.zoomIn(activeTab.id);
+      }
+      else if (ctrl && e.key === "-") {
+        e.preventDefault();
+        if (activeTab) state.zoomOut(activeTab.id);
+      }
+      else if (ctrl && e.key === "0") {
+        e.preventDefault();
+        if (activeTab) state.zoomReset(activeTab.id);
+      }
+      // Ctrl+Tab — next tab
+      else if (ctrl && e.key === "Tab") {
+        e.preventDefault();
+        const idx = state.tabs.findIndex(t => t.id === state.activeId);
+        const next = state.tabs[(idx + 1) % state.tabs.length];
+        if (next) state.activateTab(next.id);
+      }
+      // Ctrl+W — close tab
+      else if (ctrl && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        if (activeTab) state.closeTab(activeTab.id);
+      }
+      // Alt+Left — back
+      else if (e.altKey && e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (activeTab) goBack(activeTab.id);
+      }
+      // Alt+Right — forward
+      else if (e.altKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        if (activeTab) goForward(activeTab.id);
+      }
+      // F11 — toggle fullscreen
+      else if (e.key === "F11") {
+        e.preventDefault();
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen?.();
+      }
+      // Escape — close overlays
+      else if (e.key === "Escape") {
+        if (state.paletteOpen) closePalette();
+        else if (state.findInPageOpen) state.closeFindInPage();
+        else if (state.sidebarOpen) state.setSidebar(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -156,6 +238,12 @@ export function BrowserShell() {
 }
 
 function Footer({ tab }: { tab: { url: string; title: string; incognito: boolean } | undefined }) {
+  const hoveredUrl = useProxyStore((s) => s.hoveredUrl);
+  const findInPageOpen = useProxyStore((s) => s.findInPageOpen);
+  const toggleFindInPage = useProxyStore((s) => s.toggleFindInPage);
+  const zoomLevels = useProxyStore((s) => s.zoomLevels);
+  const activeId = useProxyStore((s) => s.activeId);
+  const zoom = zoomLevels[activeId] || 1;
   const socialLinks = [
     {
       href: "https://github.com/zelvior/veil",
@@ -181,30 +269,57 @@ function Footer({ tab }: { tab: { url: string; title: string; incognito: boolean
 
   return (
     <footer className="flex items-center justify-between border-t border-border bg-zinc-950 px-3 py-1.5 text-[11px] text-zinc-400 dark:text-zinc-400">
-      {/* Left: proxy status */}
+      {/* Left: proxy status / hovered URL (status bar behavior) */}
       <div className="flex items-center gap-2 min-w-0">
         <img src="/logo.png" alt="Veil" className="h-4 w-4 rounded-sm flex-shrink-0 bg-white" />
         <span className="font-semibold text-zinc-200">Veil</span>
-        <span className="text-zinc-600">·</span>
-        <span className="hidden sm:inline text-zinc-500">
-          Built by{" "}
-          <a
-            href="https://linktr.ee/zelvior"
-            target="_blank"
-            rel="noreferrer"
-            className="text-zinc-300 hover:text-emerald-400 transition-colors font-medium"
-          >
-            Zelvior Labs
-          </a>
-        </span>
-        {tab?.incognito && (
-          <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-400">
-            Incognito
+        {/* Status bar: show hovered link URL when hovering, otherwise show proxy status */}
+        {hoveredUrl ? (
+          <span className="truncate text-emerald-400/80" title={hoveredUrl}>
+            → {hoveredUrl}
           </span>
+        ) : (
+          <>
+            <span className="text-zinc-600">·</span>
+            <span className="hidden sm:inline text-zinc-500">
+              Built by{" "}
+              <a
+                href="https://linktr.ee/zelvior"
+                target="_blank"
+                rel="noreferrer"
+                className="text-zinc-300 hover:text-emerald-400 transition-colors font-medium"
+              >
+                Zelvior Labs
+              </a>
+            </span>
+            {tab?.incognito && (
+              <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-medium text-violet-400">
+                Incognito
+              </span>
+            )}
+            <span className="hidden md:inline truncate text-zinc-500">
+              {tab?.url ? `· Proxied · ${hostnameOf(tab.url)}` : "· Ready"}
+            </span>
+          </>
         )}
-        <span className="hidden md:inline truncate text-zinc-500">
-          {tab?.url ? `· Proxied · ${hostnameOf(tab.url)}` : "· Ready"}
-        </span>
+      </div>
+
+      {/* Center: find-in-page toggle + zoom indicator */}
+      <div className="hidden sm:flex items-center gap-2">
+        <button
+          onClick={toggleFindInPage}
+          className={`flex h-6 px-2 items-center justify-center rounded-md text-[10px] font-medium transition-all ${
+            findInPageOpen
+              ? "bg-emerald-500/20 text-emerald-400"
+              : "text-zinc-500 hover:text-emerald-400 hover:bg-zinc-800"
+          }`}
+          title="Find in page (Ctrl+F)"
+        >
+          Find
+        </button>
+        {zoom !== 1 && (
+          <span className="text-[10px] text-zinc-500 tabular-nums">{Math.round(zoom * 100)}%</span>
+        )}
       </div>
 
       {/* Right: legal + social links */}

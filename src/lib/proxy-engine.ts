@@ -525,7 +525,7 @@ window.open = function(u){
   return null;
 };
 
-/* ---- 3. Intercept target=_blank clicks ---- */
+/* ---- 3. Intercept target=_blank clicks + link hover for status bar ---- */
 document.addEventListener('click', function(e){
   var a = e.target && e.target.closest && e.target.closest('a');
   if (!a || !a.href) return;
@@ -534,6 +534,18 @@ document.addEventListener('click', function(e){
     var target = fromProxy(a.href);
     try { parent.postMessage({ __proxy:true, type:'open', url: target }, '*'); } catch(err){}
   }
+}, true);
+
+// Report hovered link URLs to the parent for the status bar.
+document.addEventListener('mouseover', function(e){
+  var a = e.target && e.target.closest && e.target.closest('a');
+  if (a && a.href) {
+    var target = fromProxy(a.href);
+    try { parent.postMessage({ __veilHover:true, url: target }, '*'); } catch(err){}
+  }
+}, true);
+document.addEventListener('mouseout', function(){
+  try { parent.postMessage({ __veilHover:true, url: null }, '*'); } catch(e){}
 }, true);
 
 /* ---- 4. Override window.fetch ---- */
